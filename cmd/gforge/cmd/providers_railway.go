@@ -81,6 +81,15 @@ func runRailwayDeploy(dryRun bool) error {
 
   if linked {
     // Deploy current directory to linked service/project (interactive to allow service prompts)
+    restore := withNoTokens()
+    defer restore()
+    // Pin service if provided via deployServiceName
+    if strings.TrimSpace(deployServiceName) != "" {
+      if err := execx.RunInteractive(ctx, "railway up", railwayPath, "up", "--detach", "--service", strings.TrimSpace(deployServiceName)); err != nil {
+        return err
+      }
+      return nil
+    }
     if err := execx.RunInteractive(ctx, "railway up", railwayPath, "up", "--detach"); err != nil {
       return err
     }
@@ -312,10 +321,18 @@ func setRailwayEnv(ctx context.Context, kv map[string]string, dryRun bool) error
     return nil
   }
   // Apply variables
+  restore := withNoTokens()
+  defer restore()
   for k, v := range kv {
     v = strings.TrimSpace(v)
     if v == "" { continue }
-    if err := execx.RunInteractive(ctx, "railway variables set", "railway", "variables", "set", k+"="+v); err != nil {
+    if strings.TrimSpace(deployServiceName) != "" {
+      if err := execx.RunInteractive(ctx, "railway variables --set", "railway", "variables", "--service", strings.TrimSpace(deployServiceName), "--skip-deploys", "--set", k+"="+v); err != nil {
+        return fmt.Errorf("setting %s failed: %w", k, err)
+      }
+      continue
+    }
+    if err := execx.RunInteractive(ctx, "railway variables --set", "railway", "variables", "--skip-deploys", "--set", k+"="+v); err != nil {
       return fmt.Errorf("setting %s failed: %w", k, err)
     }
   }

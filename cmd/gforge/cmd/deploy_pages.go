@@ -38,15 +38,15 @@ var deployPagesCmd = &cobra.Command{
     // 2) Try wrangler CLI, else attempt install if requested, otherwise provide guidance
     if p, ok := execx.Look("wrangler"); ok {
       fmt.Println("wrangler found:", p)
-      args := []string{"pages", "deploy", pagesOutDir}
+      args := []string{"pages", "deploy", pagesOutDir, "--commit-dirty=true"}
       if strings.TrimSpace(pagesProject) != "" { args = append(args, "--project-name", pagesProject) }
       if pagesDeployRun {
         fmt.Println("Running:", "wrangler "+strings.Join(args, " "))
         ctx := context.Background()
         if strings.TrimSpace(pagesProject) != "" {
-          if err := execx.RunInteractive(ctx, "wrangler pages deploy", "wrangler", "pages", "deploy", pagesOutDir, "--project-name", pagesProject); err != nil { return err }
+          if err := execx.RunInteractive(ctx, "wrangler pages deploy", "wrangler", "pages", "deploy", pagesOutDir, "--commit-dirty=true", "--project-name", pagesProject); err != nil { return err }
         } else {
-          if err := execx.RunInteractive(ctx, "wrangler pages deploy", "wrangler", "pages", "deploy", pagesOutDir); err != nil { return err }
+          if err := execx.RunInteractive(ctx, "wrangler pages deploy", "wrangler", "pages", "deploy", pagesOutDir, "--commit-dirty=true"); err != nil { return err }
         }
       } else {
         fmt.Println("Dry-run. To deploy with wrangler:")
@@ -62,15 +62,15 @@ var deployPagesCmd = &cobra.Command{
         // Re-run detection
         if p3, ok3 := execx.Look("wrangler"); ok3 {
           fmt.Println("wrangler found:", p3)
-          args := []string{"pages", "deploy", pagesOutDir}
+          args := []string{"pages", "deploy", pagesOutDir, "--commit-dirty=true"}
           if strings.TrimSpace(pagesProject) != "" { args = append(args, "--project-name", pagesProject) }
           if pagesDeployRun {
             fmt.Println("Running:", "wrangler "+strings.Join(args, " "))
             ctx := context.Background()
             if strings.TrimSpace(pagesProject) != "" {
-              if err := execx.RunInteractive(ctx, "wrangler pages deploy", "wrangler", "pages", "deploy", pagesOutDir, "--project-name", pagesProject); err != nil { return err }
+              if err := execx.RunInteractive(ctx, "wrangler pages deploy", "wrangler", "pages", "deploy", pagesOutDir, "--commit-dirty=true", "--project-name", pagesProject); err != nil { return err }
             } else {
-              if err := execx.RunInteractive(ctx, "wrangler pages deploy", "wrangler", "pages", "deploy", pagesOutDir); err != nil { return err }
+              if err := execx.RunInteractive(ctx, "wrangler pages deploy", "wrangler", "pages", "deploy", pagesOutDir, "--commit-dirty=true"); err != nil { return err }
             }
           } else {
             fmt.Println("Dry-run. To deploy with wrangler:")
@@ -84,7 +84,7 @@ var deployPagesCmd = &cobra.Command{
     // Guidance when wrangler not installed (avoid npm; prefer brew or prebuilt binary)
     printWranglerInstallHelp()
     fmt.Println("Then run:")
-    cmdLine := "wrangler pages deploy " + pagesOutDir
+    cmdLine := "wrangler pages deploy " + pagesOutDir + " --commit-dirty=true"
     if strings.TrimSpace(pagesProject) != "" { cmdLine += " --project-name " + pagesProject }
     fmt.Println("  "+cmdLine)
     return nil

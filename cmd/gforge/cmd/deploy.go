@@ -52,6 +52,12 @@ var deployCmd = &cobra.Command{
       fmt.Println("Deploy wizard")
     }
 
+    if strings.TrimSpace(deployServiceName) == "" {
+      if v := strings.TrimSpace(os.Getenv("GFORGE_SERVICE_NAME")); v != "" {
+        deployServiceName = v
+      }
+    }
+
     // Check required secrets/env
     required := []string{"RAILWAY_TOKEN", "NEON_TOKEN", "AIVEN_TOKEN", "CF_API_TOKEN"}
     missing := []string{}
@@ -112,6 +118,7 @@ var deployCmd = &cobra.Command{
 
     if !deployDryRun {
       // Interactive env setup only when not linked (first-time setup). Skip for subsequent deploys.
+      // Short context for quick CLI link checks only
       ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
       defer cancel()
       if !isRailwayLinkedCLI(ctx) {
@@ -134,7 +141,10 @@ var deployCmd = &cobra.Command{
           if v := strings.TrimSpace(deployNeonDBName); v != "" { _ = os.Setenv("NEON_DB_NAME", v) }
           if v := strings.TrimSpace(deployNeonUser); v != "" { _ = os.Setenv("NEON_DB_USER", v) }
           if v := strings.TrimSpace(deployNeonPass); v != "" { _ = os.Setenv("NEON_DB_PASSWORD", v) }
-          dsn, err = neonAutoProvision(ctx, deployDryRun)
+          // Use longer context for Neon API operations
+          ctxNeon, cancelNeon := context.WithTimeout(context.Background(), 10*time.Minute)
+          defer cancelNeon()
+          dsn, err = neonAutoProvision(ctxNeon, deployDryRun)
         } else {
           dsn, err = neonInteractiveProvision(ctx, deployDryRun)
         }
@@ -161,7 +171,10 @@ var deployCmd = &cobra.Command{
             fmt.Println("    → skipping Valkey setup (non-interactive)")
           } else if strings.TrimSpace(os.Getenv("AIVEN_TOKEN")) != "" {
             fmt.Println("  • Valkey: configuring cache connection (non-interactive)")
-            if vurl, verr := valkeyAutoProvision(ctx, false); verr != nil {
+            // Use longer context for Aiven API operations
+            ctxValkey, cancelValkey := context.WithTimeout(context.Background(), 20*time.Minute)
+            defer cancelValkey()
+            if vurl, verr := valkeyAutoProvision(ctxValkey, false); verr != nil {
               fmt.Println("    → skipped Valkey provisioning:", verr)
             } else if strings.TrimSpace(vurl) != "" {
               fmt.Println("    → REDIS_URL configured")
@@ -182,7 +195,9 @@ var deployCmd = &cobra.Command{
               var vurl string
               var verr error
               if strings.TrimSpace(os.Getenv("AIVEN_TOKEN")) != "" {
-                vurl, verr = valkeyAutoProvision(ctx, false)
+                ctxValkey, cancelValkey := context.WithTimeout(context.Background(), 20*time.Minute)
+                defer cancelValkey()
+                vurl, verr = valkeyAutoProvision(ctxValkey, false)
               } else {
                 vurl, verr = valkeyInteractiveProvision(ctx, false)
               }
@@ -197,7 +212,9 @@ var deployCmd = &cobra.Command{
             var vurl string
             var verr error
             if strings.TrimSpace(os.Getenv("AIVEN_TOKEN")) != "" {
-              vurl, verr = valkeyAutoProvision(ctx, false)
+              ctxValkey, cancelValkey := context.WithTimeout(context.Background(), 20*time.Minute)
+              defer cancelValkey()
+              vurl, verr = valkeyAutoProvision(ctxValkey, false)
             } else {
               vurl, verr = valkeyInteractiveProvision(ctx, false)
             }
@@ -392,7 +409,7 @@ func init() {
   deployCmd.Flags().BoolVar(&deployRun, "run", false, "execute provider CLIs (Railway, etc.) after build")
   deployCmd.Flags().BoolVar(&deployInitProject, "init-project", false, "create/link Railway project if missing (requires RAILWAY_API_TOKEN)")
   deployCmd.Flags().StringVar(&deployProjectName, "project-name", "gothic-forge-v3", "Railway project name to create/use")
-  deployCmd.Flags().StringVar(&deployServiceName, "service-name", "web", "Railway service name to create/use for this directory")
+  deployCmd.Flags().StringVar(&deployServiceName, "service-name", "", "Railway service name to create/use for this directory")
   deployCmd.Flags().StringVar(&deployTeamSlug, "team", "", "Railway team slug (optional)")
   deployCmd.Flags().BoolVar(&deployWithValkey, "with-valkey", false, "configure Valkey/Redis cache during deploy (optional)")
   deployCmd.Flags().BoolVar(&deployWithPages, "with-pages", false, "deploy static export to Cloudflare Pages (optional)")

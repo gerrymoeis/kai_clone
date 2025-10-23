@@ -6,6 +6,7 @@ import (
     "encoding/hex"
     "fmt"
     "os"
+    "os/exec"
     "path/filepath"
     "strings"
     "time"
@@ -125,6 +126,23 @@ var installCmd = &cobra.Command{
 
         fmt.Println("────────────────────────────────────────")
         fmt.Println("Install complete.")
+        
+        // Check for external deployment tools and provide guidance
+        fmt.Println("")
+        fmt.Println("🔍 Checking deployment tools (optional):")
+        checkExternalTool("Railway CLI", "railway", "npm install -g railway", "https://docs.railway.app/guides/cli")
+        checkExternalTool("Cloudflare Wrangler", "wrangler", "npm install -g wrangler", "https://developers.cloudflare.com/workers/wrangler/install-and-update/")
+        checkExternalTool("Docker", "docker", "", "https://docs.docker.com/get-docker/")
+        
+        fmt.Println("")
+        fmt.Println("💡 These tools are needed for production deployment:")
+        fmt.Println("   • Railway CLI - for Railway deployments")
+        fmt.Println("   • Wrangler - for Cloudflare Pages/Workers")
+        fmt.Println("   • Docker - for Back4app Containers (optional)")
+        fmt.Println("")
+        fmt.Println("✅ Run 'gforge doctor' to see full system check")
+        fmt.Println("✅ Run 'gforge dev' to start development server")
+        
         return nil
     },
 }
@@ -145,6 +163,22 @@ func genHex(n int) string {
     b := make([]byte, n)
     if _, err := rand.Read(b); err != nil { return "" }
     return hex.EncodeToString(b)
+}
+
+// checkExternalTool checks if a tool is installed and provides installation guidance if missing.
+func checkExternalTool(name, command, installCmd, docsURL string) {
+    _, err := exec.LookPath(command)
+    if err != nil {
+        fmt.Printf("   ⚠️  %s: not found\n", name)
+        if installCmd != "" {
+            fmt.Printf("      Install: %s\n", installCmd)
+        }
+        if docsURL != "" {
+            fmt.Printf("      Docs: %s\n", docsURL)
+        }
+    } else {
+        fmt.Printf("   ✅ %s: installed\n", name)
+    }
 }
 
 // ensureDockerFiles creates Dockerfile and .dockerignore if they don't exist.

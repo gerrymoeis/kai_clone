@@ -1,8 +1,10 @@
 # 🚀 Gothic Forge v3 - Quickstart Guide
 
-**From Zero to Production in ~15 Minutes**
+**Development Ready in 2 Minutes | Deploy to Production in 5 Minutes**
 
 This guide walks you through cloning Gothic Forge, setting up your development environment, and deploying to production using our **opinionated omakase stack**.
+
+> **Reality Check**: Actual time depends on API key acquisition (external services). The framework itself is designed for speed—deployment automation takes ~2-5 minutes once keys are configured.
 
 ---
 
@@ -35,7 +37,7 @@ Gothic Forge is opinionated about best-in-class services:
 
 ---
 
-## 🏁 Step 1: Clone & Bootstrap
+## 🏁 Step 1: Clone & Build CLI
 
 ### 1.1 Clone the Repository
 
@@ -49,11 +51,33 @@ git clone git@github.com:gerrymoeis/gothic_forge.git
 cd gothic_forge
 ```
 
-### 1.2 Check Your Environment
+### 1.2 Build the gforge CLI
+
+```bash
+# Build the CLI first (one-time setup)
+go build -o gforge ./cmd/gforge
+
+# Windows users:
+go build -o gforge.exe ./cmd/gforge
+
+# Add to PATH (optional but recommended):
+# Linux/Mac: sudo mv gforge /usr/local/bin/
+# Windows: Move gforge.exe to a folder in your PATH
+```
+
+**Tip**: Or use `go run ./cmd/gforge <command>` if you prefer not to build.
+
+### 1.3 Check Your Environment
 
 ```bash
 # Run the doctor to see what you have/need
+./gforge doctor
+
+# Or if you added to PATH:
 gforge doctor
+
+# Or without building:
+go run ./cmd/gforge doctor
 ```
 
 **Expected Output:**
@@ -69,11 +93,11 @@ Doctor
   • docker: (missing)
 ```
 
-### 1.3 Bootstrap Your Project
+### 1.4 Bootstrap Your Project
 
 ```bash
-# Install all dependencies and tools
-gforge install
+# Install all dependencies and tools (takes ~30 seconds)
+./gforge install
 
 # This will:
 # ✅ Install templ (template engine)
@@ -84,16 +108,21 @@ gforge install
 # ✅ Create Dockerfile & .dockerignore
 ```
 
-**What If Tools Are Missing?**
-
-Gothic Forge attempts to auto-install Go tools. If installation fails, you'll get:
-
-```bash
-⚠️  templ: not found
-    Install: go install github.com/a-h/templ/cmd/templ@latest
+**Expected Output:**
+```
+Gothic Forge v3 :: CLI
+Install
+  • Ensuring Go modules...
+  • Installing tools: templ, air, gotailwindcss
+  • Scaffolding styles
+  • Creating static assets
+  • Dockerfile already exists
+  • .dockerignore already exists
+────────────────────────────────────────
+Install complete.
 ```
 
-Run the suggested command manually.
+**Note**: `gforge install` only installs **Go tools**. External CLIs (Railway, wrangler, Docker) are checked during `gforge doctor` and guided during deployment.
 
 ---
 

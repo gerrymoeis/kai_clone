@@ -163,13 +163,18 @@ gforge build
 ### 2.3 Run Tests
 
 ```bash
-# Run all tests with pretty output
+# Run all tests (verbose by default)
 gforge test
 
 # Run with coverage
 gforge test --coverage
+# Or use shorthand:
+gforge test --cover
 
-# Verbose mode
+# Quiet mode (disable verbose)
+gforge test --verbose=false
+
+# Shorthand verbose flag also works
 gforge test -v
 ```
 

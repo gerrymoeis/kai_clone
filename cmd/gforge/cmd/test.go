@@ -15,6 +15,7 @@ var (
   testWithBuild bool
   testDir   string
   testCover bool
+  testVerbose bool
 )
 
 var testCmd = &cobra.Command{
@@ -42,7 +43,8 @@ var testCmd = &cobra.Command{
     }
     fmt.Println("────────────────────────────────────────")
     fmt.Printf("Running tests in: %s\n", target)
-    goArgs := []string{"go", "test", target, "-v"}
+    goArgs := []string{"go", "test", target}
+    if testVerbose { goArgs = append(goArgs, "-v") }
     if testShort { goArgs = append(goArgs, "-short") }
     if testRace {
       // Only enable -race when CGO is enabled; otherwise warn and continue without -race
@@ -62,10 +64,13 @@ var testCmd = &cobra.Command{
 }
 
 func init() {
+  testCmd.Flags().BoolVarP(&testVerbose, "verbose", "v", true, "verbose output (use --verbose=false to disable)")
   testCmd.Flags().BoolVar(&testShort, "short", false, "run short tests")
   testCmd.Flags().BoolVar(&testRace, "race", false, "enable race detector")
   testCmd.Flags().BoolVar(&testWithBuild, "with-build", false, "run build before tests")
   testCmd.Flags().StringVar(&testDir, "dir", "", "test package pattern (e.g., ./tests or ./...) ")
   testCmd.Flags().BoolVar(&testCover, "cover", false, "enable coverage output")
+  // Add --coverage as alias for --cover (common expectation)
+  testCmd.Flags().BoolVar(&testCover, "coverage", false, "enable coverage output (alias for --cover)")
   rootCmd.AddCommand(testCmd)
 }

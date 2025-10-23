@@ -70,3 +70,39 @@ func init() {
   rootCmd.AddCommand(dbCmd)
 }
 
+// runMigrationsAuto automatically applies database migrations after provisioning.
+// This is called by deployment workflows to ensure schema is up-to-date.
+// Returns nil if migrations succeed or if migrations directory doesn't exist yet.
+func runMigrationsAuto(ctx context.Context, dsn string) error {
+  if dsn == "" {
+    return nil // No database configured, skip migrations
+  }
+
+  dir := filepath.Join("app", "db", "migrations")
+  if _, err := os.Stat(dir); os.IsNotExist(err) {
+    fmt.Println("    → No migrations directory found (this is OK for new projects)")
+    return nil // Migrations directory doesn't exist yet, that's fine
+  }
+
+  fmt.Println("    → Running database migrations...")
+
+  // Open database connection
+  dbx, err := sql.Open("pgx", dsn)
+  if err != nil {
+    return fmt.Errorf("failed to connect to database: %w", err)
+  }
+  defer dbx.Close()
+
+  // Test connection
+  if err := dbx.PingContext(ctx); err != nil {
+    return fmt.Errorf("database unreachable: %w", err)
+  }
+
+  // Apply migrations
+  if err := goose.Up(dbx, dir); err != nil {
+    return fmt.Errorf("migrations failed: %w", err)
+  }
+
+  fmt.Println("    → Migrations applied successfully")
+  return nil
+}

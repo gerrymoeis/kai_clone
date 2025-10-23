@@ -68,33 +68,72 @@ func Register(r *chi.Mux) {
         http.Redirect(w, req, "/static/favicon.svg", http.StatusMovedPermanently)
     })
 
-    // health
+    // health - basic liveness check (always returns 200 if app is running)
+    // Used by: Docker HEALTHCHECK, load balancers, uptime monitors
     r.Get("/healthz", func(w http.ResponseWriter, req *http.Request) {
         w.Header().Set("Content-Type", "text/plain; charset=utf-8")
         _, _ = w.Write([]byte("ok"))
     })
 
-    // readiness (checks external deps when configured)
+    // liveness - Kubernetes liveness probe
+    // Returns 200 if the application is alive (process is running)
+    // Container should be restarted if this fails
+    // Educational: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/
+    r.Get("/livez", func(w http.ResponseWriter, req *http.Request) {
+        w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+        w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+        _, _ = w.Write([]byte("alive"))
+    })
+
+    // readiness - Kubernetes readiness probe (checks external dependencies)
+    // Returns 200 only when app is ready to serve traffic
+    // Load balancers should remove pod from rotation if this fails
+    // Educational: Readiness checks prevent sending traffic to pods that can't handle it
     r.Get("/readyz", func(w http.ResponseWriter, req *http.Request) {
         w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+        w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
         status := http.StatusOK
-        // Valkey readiness (optional)
+        results := make([]string, 0)
+
+        // Check Valkey/Redis (optional dependency)
         if err := valkeyPing(); err != nil {
             status = http.StatusServiceUnavailable
-            _, _ = w.Write([]byte("valkey: FAIL\n"))
+            results = append(results, "valkey: FAIL")
         } else {
-            _, _ = w.Write([]byte("valkey: OK|SKIP\n"))
+            valkeyURL := strings.TrimSpace(env.Get("VALKEY_URL", env.Get("REDIS_URL", "")))
+            if valkeyURL != "" {
+                results = append(results, "valkey: OK")
+            } else {
+                results = append(results, "valkey: SKIP")
+            }
         }
-        // DB readiness (optional)
+
+        // Check database (optional dependency)
         if skip, err := dbReady(); skip {
-            _, _ = w.Write([]byte("db: SKIP\n"))
+            results = append(results, "db: SKIP")
         } else if err != nil {
             status = http.StatusServiceUnavailable
-            _, _ = w.Write([]byte("db: FAIL\n"))
+            results = append(results, "db: FAIL")
         } else {
-            _, _ = w.Write([]byte("db: OK\n"))
+            results = append(results, "db: OK")
         }
-        if status != http.StatusOK { w.WriteHeader(status) }
+
+        // Write status first if not OK (for proper HTTP semantics)
+        if status != http.StatusOK {
+            w.WriteHeader(status)
+        }
+
+        // Return results
+        for _, r := range results {
+            _, _ = w.Write([]byte(r + "\n"))
+        }
+
+        // Overall status
+        if status == http.StatusOK {
+            _, _ = w.Write([]byte("ready"))
+        } else {
+            _, _ = w.Write([]byte("not ready"))
+        }
     })
 
     // robots.txt (serve from root). If a file exists under app/static, stream it directly; otherwise emit sensible defaults.

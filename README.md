@@ -8,6 +8,26 @@ Gothic Forge v3 is built with Go, [chi](https://github.com/go-chi/chi),
 [DaisyUI](https://daisyui.com/). It ships secure defaults (CSP, CSRF, rate limiting),
 server‑side rendering, and a fast developer experience with hot reload.
 
+## Philosophy: Teaching Through Doing
+
+Gothic Forge embraces an **opinionated, educational approach** to web development:
+
+- **Batteries-included** - Sane defaults that work out of the box
+- **Guided learning** - Some deployment steps teach you WHY, not just HOW
+- **Production-ready** - Omakase stack choices based on real-world experience
+- **Developer empowerment** - Learn the platform, don't just use a black box
+
+### Why Some Steps Are Manual
+
+For certain platforms (like Back4app Containers), we intentionally guide you through manual setup steps instead of automating everything. This helps you:
+
+1. **Understand your deployment** - Know exactly what's running where
+2. **Debug effectively** - When things go wrong, you know the architecture
+3. **Make informed choices** - Learn why we chose these specific services
+4. **Gain transferable skills** - These patterns apply beyond Gothic Forge
+
+After the initial guided setup, everything runs automatically via `git push` or CLI commands.
+
 ## Stack
 
 - Go
@@ -35,8 +55,12 @@ server‑side rendering, and a fast developer experience with hot reload.
 
 Prerequisites:
 
-- Go 1.22+
+- **Go 1.22+** (required)
+- **Git** (required for deployments)
+- **Docker** (required for Back4app Containers deployments)
 - Optional CLIs: `templ`, `gotailwindcss` (auto-checked by `gforge doctor`)
+
+Run `gforge doctor --fix` to check all prerequisites and get installation guidance.
 
 Doctor:
 
@@ -70,10 +94,36 @@ go run ./cmd/gforge build
 - `/favicon.ico` — 301 → `/static/favicon.svg`
 - `/robots.txt` — Defaults or stream `app/static/robots.txt`
 - `/sitemap.xml` — Defaults or stream `app/static/sitemap.xml`
-- `/readyz` — Readiness (Valkey optional; DB optional if `DATABASE_URL` is set)
 - `/db/posts` — Sample DB‑backed feature (requires `DATABASE_URL`; POST/PUT/DELETE require JWT)
 - `/static/*` — Files under `app/static`
 - `/static/styles/*` — Files under `app/styles`
+
+### Health Check Endpoints
+
+Production-grade health monitoring endpoints following Kubernetes best practices:
+
+- **`/healthz`** — Basic health check (always returns `ok` if app is running)
+  - Used by: Docker HEALTHCHECK, uptime monitors
+  - Returns: 200 OK with `ok` response
+
+- **`/livez`** — Liveness probe (process health check)
+  - Used by: Kubernetes liveness probes
+  - Returns: 200 OK with `alive` response
+  - Purpose: Container should be restarted if this fails
+
+- **`/readyz`** — Readiness probe (dependency health checks)
+  - Used by: Kubernetes readiness probes, load balancers
+  - Checks: Database connectivity (if configured), Valkey/Redis (if configured)
+  - Returns: 200 OK with detailed status when ready
+  - Returns: 503 Service Unavailable when dependencies are down
+  - Purpose: Remove pod from load balancer rotation if not ready
+
+Example readiness response:
+```
+valkey: OK
+db: OK
+ready
+```
 
 Main entry: `app/routes/routes.go`.
 
@@ -136,31 +186,66 @@ DATABASE_URL=
 - `CORS_ORIGINS`: comma-separated origins (use `*` in dev only).
 - `SITE_BASE_URL`: absolute base used by SEO helpers and generated sitemap links.
 
-## Database (Neon) & Migrations
+## Database & Migrations
 
-This project uses PostgreSQL via `pgx` and SQL migrations via `goose`.
+Gothic Forge uses **CockroachDB Serverless** as the opinionated database standard, with PostgreSQL compatibility via `pgx` and SQL migrations via `goose`.
 
-### 1) Install DB dependencies
+### Why CockroachDB Serverless?
 
-```powershell
-go get github.com/jackc/pgx/v5@latest
-go get github.com/pressly/goose/v3@latest
-go mod tidy
+- **PostgreSQL-compatible** - Works with existing PostgreSQL tools and libraries
+- **True serverless** - Pay only for what you use, scales to zero
+- **Global distribution** - Low latency worldwide with automatic replication
+- **Built-in resilience** - Automatic failover and high availability
+- **Educational value** - Learn distributed SQL and modern cloud-native architecture
+
+### 1) Automatic Provisioning (Recommended)
+
+The `gforge deploy` command automatically provisions and configures your database:
+
+```bash
+# Set your CockroachDB API key in .env
+COCKROACH_API_KEY=your_api_key_here
+
+# Deploy will automatically:
+# 1. Create a serverless cluster
+# 2. Configure database and user
+# 3. Generate secure connection string
+# 4. Run migrations automatically
+gforge deploy
 ```
 
-### 2) Create a Neon project
+**Get your API key**: https://cockroachlabs.cloud/signup
 
-- Sign up: https://neon.tech
-- Create a project and database (e.g., `neondb`).
-- Copy the Postgres connection string from the console and set it in `.env`:
+### 2) Manual Setup (Alternative)
 
+If you prefer manual setup or want to use an existing cluster:
+
+1. Create a CockroachDB Serverless cluster at https://cockroachlabs.cloud
+2. Copy the connection string and set it in `.env`:
+
+```bash
+DATABASE_URL=postgresql://<user>:<password>@<host>:26257/<db>?sslmode=verify-full
 ```
+
+**Note**: CockroachDB uses `sslmode=verify-full` for enhanced security.
+
+### 3) Using Neon (Fallback Option)
+
+If you prefer Neon Postgres, it's fully supported:
+
+```bash
+# Set NEON_TOKEN instead of COCKROACH_API_KEY
+NEON_TOKEN=your_neon_token_here
+
+# Or manually set DATABASE_URL
 DATABASE_URL=postgres://<user>:<password>@<host>.neon.tech/<db>?sslmode=require
 ```
 
-`sslmode=require` is recommended for Neon.
+### 4) Working with Migrations
 
-### 3) Create and run migrations
+Migrations are located in `app/db/migrations/` and use the goose format.
+
+#### Create and run migrations
 
 - Create a migration file:
 
@@ -233,6 +318,17 @@ MIT — see `LICENSE`.
 
 ## Deployment
 
+### Omakase Stack Choices
+
+Gothic Forge supports multiple deployment providers with different philosophies:
+
+| Provider | Approach | Best For | Requires |
+|----------|----------|----------|----------|
+| **Railway** | Automated CLI | Fast iteration, existing users | Railway CLI, tokens |
+| **Back4app** | Guided manual | Learning, GitHub workflow | Git, Docker, GitHub repo |
+
+Choose via `--provider` flag: `gforge deploy --provider=railway` (default) or `--provider=back4app`.
+
 ### First Deploy (quick guide)
 
 1) Prepare `.env`:
@@ -249,32 +345,84 @@ go run ./cmd/gforge secrets --set JWT_SECRET=$(openssl rand -hex 32)
 go run ./cmd/gforge doctor --fix
 ```
 
-3) Dry-run to preview steps:
+3) Choose your provider and deploy:
 
 ```powershell
-go run ./cmd/gforge deploy --dry-run
+# Railway (automated CLI workflow)
+go run ./cmd/gforge deploy --provider=railway --run
+
+# Back4app Containers (guided setup, teaches Docker + CI/CD)
+go run ./cmd/gforge deploy --provider=back4app
 ```
-
-4) Interactive first deploy (provisions Neon/Valkey when tokens present, builds, syncs env to Railway, optional Pages):
-
-```powershell
-go run ./cmd/gforge deploy --run
-```
-
-If you plan to use GitHub OAuth, see the section below to set it up before prod.
 
 ### Token Checklist
 
+**Compute Providers** (choose one):
 - Railway:
   - `RAILWAY_TOKEN` (project token) or `RAILWAY_API_TOKEN` (account/team)
+- Back4app:
+  - `B4A_APP_URL` (saved automatically after guided setup)
+
+**Shared Services**:
 - Neon: `NEON_TOKEN`
 - Aiven Valkey: `AIVEN_TOKEN`
 - Cloudflare Pages: `CF_API_TOKEN`, `CF_ACCOUNT_ID`, `CF_PROJECT_NAME`
 - Optional OAuth: `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `OAUTH_BASE_URL` (defaults to `SITE_BASE_URL`)
 
-Store these in `.env` locally. The deploy wizard can sync the key runtime ones to Railway for you.
+Store these in `.env` locally. The deploy wizard can sync the key runtime ones to your provider.
 
-### Railway (server/compute)
+### Back4app Containers (guided, educational)
+
+Back4app Containers uses a **guided manual setup** to teach Docker containerization and GitHub-based CI/CD.
+
+**Why guided instead of automated?**
+- You learn Docker containerization workflow
+- Understand GitHub Actions integration
+- Practice environment variable management
+- Gain transferable DevOps knowledge
+
+**Prerequisites**:
+- Git installed and configured
+- Docker installed and running
+- GitHub repository created
+- Dockerfile in project root
+
+**First-time setup**:
+
+```powershell
+# Interactive guided setup (one-time only)
+go run ./cmd/gforge deploy --provider=back4app
+```
+
+The wizard will walk you through:
+1. Creating Back4app account
+2. Connecting your GitHub repository
+3. Configuring environment variables
+4. Watching the initial Docker build
+5. Saving your deployment URL
+
+**Subsequent deployments** (the easy way):
+
+```bash
+git commit -am "your changes"
+git push origin main
+# Back4app auto-builds and deploys! ✨
+```
+
+**What you learn**:
+- Docker image building and containerization
+- GitHub webhooks and auto-deployment
+- Environment-based configuration
+- Zero-downtime rolling deployments
+- Platform debugging and log analysis
+
+**Troubleshooting**:
+- Check `gforge doctor` for Git/Docker status
+- Ensure Dockerfile exists in project root
+- Verify environment variables in Back4app dashboard
+- View deployment logs at https://dashboard.back4app.com/apps
+
+### Railway (automated CLI)
 
 Use the deploy wizard to guide environment setup and deploy. It checks required secrets and can run an interactive Railway flow.
 

@@ -8,6 +8,7 @@ import (
   "net"
   "net/url"
   "os"
+  "os/exec"
   "path/filepath"
   "runtime"
   "strconv"
@@ -35,7 +36,23 @@ var doctorCmd = &cobra.Command{
     // Go version
     fmt.Printf("  • Go: %s (%s/%s)\n", runtime.Version(), runtime.GOOS, runtime.GOARCH)
 
-    // Tools
+    // Core tools (Git is essential for deployment workflows)
+    gitPath, gitOK := execx.Look("git")
+    fmt.Printf("  • git: %s\n", pathOrMissing(gitPath, gitOK))
+    if gitOK {
+      if v, err := execx.RunCapture(context.Background(), "git --version", "git", "--version"); err == nil {
+        v = strings.TrimSpace(v)
+        if v != "" { fmt.Printf("    → %s\n", v) }
+      }
+    } else {
+      fmt.Println("    ⚠️  Git is required for deployment workflows (Back4app, Railway)")
+      if doctorFix {
+        fmt.Println("    → Git requires manual installation")
+        printGitInstallHelp()
+      }
+    }
+
+    // Development tools
     templPath, templOK := execx.Look("templ")
     gwPath, gwOK := execx.Look("gotailwindcss")
     fmt.Printf("  • templ: %s\n", pathOrMissing(templPath, templOK))
@@ -96,6 +113,71 @@ var doctorCmd = &cobra.Command{
         }
       } else {
         fmt.Println("    → failed to install wrangler:", err)
+      }
+    }
+
+    // Docker (required for Back4app Containers)
+    dockerPath, dockerOK := execx.Look("docker")
+    fmt.Printf("  • docker: %s\n", pathOrMissing(dockerPath, dockerOK))
+    if dockerOK {
+      if v, err := execx.RunCapture(context.Background(), "docker --version", "docker", "--version"); err == nil {
+        v = strings.TrimSpace(v)
+        if v != "" { fmt.Printf("    → %s\n", v) }
+      }
+      // Check if Docker daemon is running
+      ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+      if err := execx.Run(ctx, "docker ps", "docker", "ps"); err == nil {
+        fmt.Println("    → Docker daemon: running")
+      } else {
+        fmt.Println("    → Docker daemon: not running (start Docker Desktop)")
+      }
+      cancel()
+    } else if doctorFix {
+      fmt.Println("    → Docker requires manual installation")
+      printDockerInstallHelp()
+    }
+
+    // Dockerfile validation (required for containerized deployments)
+    dockerfilePath := "Dockerfile"
+    dockerignorePath := ".dockerignore"
+    hasDockerfile := false
+    if _, err := os.Stat(dockerfilePath); os.IsNotExist(err) {
+      fmt.Printf("  • Dockerfile: missing\n")
+      if doctorFix {
+        fmt.Println("    → Creating Dockerfile for container deployments")
+        if err := ensureDockerFiles(); err != nil {
+          fmt.Println("    → failed to create Docker files:", err)
+        } else {
+          fmt.Println("    → Dockerfile and .dockerignore created")
+          hasDockerfile = true
+        }
+      } else {
+        fmt.Println("    ⚠️  Required for Back4app Containers deployment")
+      }
+    } else {
+      fmt.Printf("  • Dockerfile: present\n")
+      hasDockerfile = true
+      // Validate Dockerfile syntax if Docker is available
+      if dockerOK {
+        if err := validateDockerfile(dockerfilePath); err == nil {
+          fmt.Println("    → Dockerfile syntax: valid")
+        } else {
+          fmt.Printf("    ⚠️  Dockerfile syntax check failed: %s\n", err)
+        }
+      }
+    }
+    if hasDockerfile {
+      if _, err := os.Stat(dockerignorePath); os.IsNotExist(err) {
+        fmt.Printf("  • .dockerignore: missing (recommended for faster builds)\n")
+        if doctorFix {
+          // This should have been created by ensureDockerFiles, but handle separately
+          fmt.Println("    → Creating .dockerignore")
+          if err := ensureDockerFiles(); err != nil {
+            fmt.Println("    → failed:", err)
+          }
+        }
+      } else {
+        fmt.Printf("  • .dockerignore: present\n")
       }
     }
 
@@ -308,6 +390,67 @@ func init() {
   doctorCmd.Flags().BoolVar(&doctorFix, "fix", false, "attempt to fix common issues")
   rootCmd.AddCommand(doctorCmd)
 }
+
+// printGitInstallHelp displays platform-specific Git installation instructions.
+func printGitInstallHelp() {
+  fmt.Println("  • Git installation guide:")
+  switch runtime.GOOS {
+  case "windows":
+    fmt.Println("    - Git for Windows: https://git-scm.com/download/win")
+    fmt.Println("    - Chocolatey: choco install git")
+    fmt.Println("    - Winget: winget install Git.Git")
+    fmt.Println("    - Scoop: scoop install git")
+  case "darwin":
+    fmt.Println("    - Xcode Command Line Tools: xcode-select --install")
+    fmt.Println("    - Homebrew: brew install git")
+    fmt.Println("    - Official installer: https://git-scm.com/download/mac")
+  default: // linux
+    fmt.Println("    - Debian/Ubuntu: sudo apt-get install git")
+    fmt.Println("    - Fedora: sudo dnf install git")
+    fmt.Println("    - Arch: sudo pacman -S git")
+    fmt.Println("    - Other distros: https://git-scm.com/download/linux")
+  }
+  fmt.Println("  • After installation, verify with: git --version")
+}
+
+// printDockerInstallHelp displays platform-specific Docker installation instructions.
+func printDockerInstallHelp() {
+  fmt.Println("  • Docker installation required for Back4app Containers:")
+  switch runtime.GOOS {
+  case "windows":
+    fmt.Println("    - Docker Desktop (recommended): https://docs.docker.com/desktop/install/windows-install/")
+    fmt.Println("    - Requires WSL2 for better performance")
+  case "darwin":
+    fmt.Println("    - Docker Desktop for Mac: https://docs.docker.com/desktop/install/mac-install/")
+    fmt.Println("    - Also available via Homebrew: brew install --cask docker")
+  default: // linux
+    fmt.Println("    - Docker Engine: https://docs.docker.com/engine/install/")
+    fmt.Println("    - Or Docker Desktop: https://docs.docker.com/desktop/install/linux-install/")
+  }
+}
+
+// validateDockerfile checks if the Dockerfile has valid syntax using docker build --dry-run.
+// Returns nil if valid, error if invalid or check fails.
+func validateDockerfile(path string) error {
+  ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+  defer cancel()
+  
+  // Use docker build with --dry-run to validate syntax without actually building
+  cmd := exec.CommandContext(ctx, "docker", "build", "--dry-run", "-f", path, ".")
+  output, err := cmd.CombinedOutput()
+  if err != nil {
+    // Parse output for specific errors
+    outStr := string(output)
+    if strings.Contains(outStr, "ERROR") || strings.Contains(outStr, "failed") {
+      return fmt.Errorf("syntax error: %s", strings.TrimSpace(outStr))
+    }
+    return err
+  }
+  return nil
+}
+
+// Note: ensureDockerFiles, createDockerfile, and createDockerignore are defined in install.go
+// and shared across the cmd package.
 
 // probePostgres attempts a short ping to DATABASE_URL using pgx stdlib.
 func probePostgres(dsn string) error {

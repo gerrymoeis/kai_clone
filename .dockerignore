@@ -1,0 +1,130 @@
+# Gothic Forge v3 - Docker Build Context Exclusions
+#
+# Why .dockerignore?
+# 1. Faster builds: Smaller build context = faster upload to Docker daemon
+# 2. Security: Don't accidentally include secrets or sensitive files
+# 3. Smaller images: Prevents unnecessary files in final image layers
+#
+# Similar to .gitignore but for Docker builds
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Version Control
+# ═══════════════════════════════════════════════════════════════════════════
+.git/
+.github/
+.gitignore
+.gitattributes
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Documentation (not needed in runtime image)
+# ═══════════════════════════════════════════════════════════════════════════
+README.md
+CONTRIBUTING.md
+CODE_OF_CONDUCT.md
+SECURITY.md
+LICENSE
+PHILOSOPHY.md
+*.md
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Environment & Secrets (CRITICAL: Never include in Docker image)
+# ═══════════════════════════════════════════════════════════════════════════
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.crt
+*.cert
+secrets/
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Development Tools & Config
+# ═══════════════════════════════════════════════════════════════════════════
+.vscode/
+.idea/
+.editorconfig
+.air.toml
+.golangci.yml
+.goreleaser.yaml
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Build Artifacts & Binaries (rebuilt in Docker)
+# ═══════════════════════════════════════════════════════════════════════════
+dist/
+build/
+*.exe
+*.dll
+*.so
+*.dylib
+gforge
+gforge.exe
+server
+server.exe
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Test Files & Coverage (not needed in production)
+# ═══════════════════════════════════════════════════════════════════════════
+tests/
+*_test.go
+*.test
+coverage.out
+coverage.html
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Temporary & Cache Files
+# ═══════════════════════════════════════════════════════════════════════════
+tmp/
+temp/
+*.tmp
+*.cache
+*.log
+
+# ═══════════════════════════════════════════════════════════════════════════
+# OS-specific Files
+# ═══════════════════════════════════════════════════════════════════════════
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Node modules (if accidentally present)
+# ═══════════════════════════════════════════════════════════════════════════
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Docker files (don't need Dockerfile inside container)
+# ═══════════════════════════════════════════════════════════════════════════
+Dockerfile*
+.dockerignore
+docker-compose*.yml
+
+# ═══════════════════════════════════════════════════════════════════════════
+# CI/CD configs (not needed at runtime)
+# ═══════════════════════════════════════════════════════════════════════════
+.github/
+Jenkinsfile
+.travis.yml
+.gitlab-ci.yml
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Deployment configs (managed outside container)
+# ═══════════════════════════════════════════════════════════════════════════
+railway.json
+railway.toml
+fly.toml
+render.yaml
+Caddyfile
+
+# ═══════════════════════════════════════════════════════════════════════════
+# IMPORTANT: What we DO include
+# ═══════════════════════════════════════════════════════════════════════════
+# ✓ go.mod, go.sum (dependencies)
+# ✓ cmd/ (source code)
+# ✓ internal/ (source code)
+# ✓ app/templates/ (Templ templates)
+# ✓ app/static/ (static assets)
+# ✓ app/styles/ (CSS)
+# ✓ app/db/ (migrations)

@@ -56,14 +56,17 @@ var secretsCmd = &cobra.Command{
     if secretsGenJWT {
       v := strings.TrimSpace(kv["JWT_SECRET"])
       if v == "" || len(v) < 32 || strings.EqualFold(v, "devsecret-change-me") {
-        kv["JWT_SECRET"] = genSecret()
+        newSecret := genSecret()
+        kv["JWT_SECRET"] = newSecret
         // Rewrite .env
         b := &strings.Builder{}
         for k, val := range kv { fmt.Fprintf(b, "%s=%s\n", k, val) }
         if err := os.WriteFile(envPath, []byte(b.String()), 0o600); err != nil { return err }
-        fmt.Println("→ generated strong JWT_SECRET and saved to .env")
+        fmt.Println("✅ Generated strong JWT_SECRET")
+        fmt.Printf("   → Saved to .env (%d characters)\n", len(newSecret))
       } else {
-        fmt.Println("JWT_SECRET already set and looks strong; no changes made")
+        fmt.Println("✅ JWT_SECRET already set and looks strong")
+        fmt.Println("   → No changes made")
       }
       return nil
     }
@@ -78,7 +81,11 @@ var secretsCmd = &cobra.Command{
       // Rewrite .env
       b := &strings.Builder{}
       for k, v := range kv { fmt.Fprintf(b, "%s=%s\n", k, v) }
-      return os.WriteFile(envPath, []byte(b.String()), 0o600)
+      if err := os.WriteFile(envPath, []byte(b.String()), 0o600); err != nil {
+        return err
+      }
+      fmt.Printf("✅ Set %s in .env\n", key)
+      return nil
     }
     return nil
   },

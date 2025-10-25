@@ -197,11 +197,12 @@ You'll need API keys for each service. Gothic Forge will guide you, but here's a
 #### **CockroachDB Serverless** (Database) - RECOMMENDED ⭐
 
 1. **Sign up**: [https://cockroachlabs.cloud/signup](https://cockroachlabs.cloud/signup)
-2. **Create API key**: 
-   - Go to [Account → API Access](https://cockroachlabs.cloud/account/api-access)
-   - Click **"Create API Key"**
-   - Name: `gothic-forge-deploy`
-   - **Copy the key** (shown only once!)
+2. **Create service account**:
+   - Go to [Organization → Service Accounts](https://cockroachlabs.cloud/service-accounts)
+   - Click **"Create"**
+   - Name: `gforge` or `gothic-forge-deploy`
+   - Role: **Organization Member** (minimum required)
+   - **Copy the API key** (shown only once!)
 3. **Save to .env**:
    ```bash
    gforge secrets --set COCKROACH_API_KEY=<your-key-here>
@@ -213,11 +214,11 @@ You'll need API keys for each service. Gothic Forge will guide you, but here's a
 
 1. **Sign up**: [https://console.aiven.io/signup](https://console.aiven.io/signup)
 2. **Create token**: 
-   - Go to [Account → Tokens](https://console.aiven.io/account/tokens)
+   - Go to [User Profile → Tokens](https://console.aiven.io/profile/tokens)
    - Click **"Generate token"**
    - Description: `gothic-forge-deploy`
-   - Permissions: **"Read/Write"**
-   - **Copy the token**
+   - Max age: **1 month** or **None** (never expires)
+   - **Copy the token** (shown only once!)
 3. **Save to .env**:
    ```bash
    gforge secrets --set AIVEN_TOKEN=<your-token>

@@ -123,9 +123,9 @@ func cockroachInteractiveProvision(ctx context.Context, dryRun bool) (string, er
 	if apiKey == "" {
 		fmt.Println("  • CockroachDB: COCKROACH_API_KEY not set")
 		fmt.Println("")
-		fmt.Println("    How to get your API key:")
+		fmt.Println("    How to get your service account API key:")
 		fmt.Println("    1. Sign up: https://cockroachlabs.cloud/signup")
-		fmt.Println("    2. Create API key: https://cockroachlabs.cloud/account/api-access")
+		fmt.Println("    2. Create service account: https://cockroachlabs.cloud/service-accounts")
 		fmt.Println("    3. Set in .env: COCKROACH_API_KEY=<your-key>")
 		fmt.Println("")
 		fmt.Println("    Educational Note:")

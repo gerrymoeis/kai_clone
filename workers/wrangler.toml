@@ -1,0 +1,27 @@
+# Cloudflare Workers configuration for Gothic Forge Demo
+# This Worker handles dynamic endpoints (/counter/sync) alongside Cloudflare Pages (static assets)
+#
+# Setup Instructions:
+# 1. Deploy your Pages site first: gforge deploy pages --project=your-project --run
+# 2. Note your Pages URL (e.g., https://your-project.pages.dev)
+# 3. Update the routes below with your actual Pages domain
+# 4. Deploy this Worker: gforge deploy workers --run
+# 5. The Worker will handle /counter/sync on your Pages domain
+
+name = "gothic-forge-demo-worker"
+main = "counter.js"
+compatibility_date = "2025-01-01"
+
+# IMPORTANT: Update these routes with your actual Pages domain
+# Example: If your Pages URL is https://gothic-forge-demo.pages.dev
+# Then update to: { pattern = "gothic-forge-demo.pages.dev/counter/*", zone_name = "" }
+#
+# Note: You can also set this up in Cloudflare Dashboard:
+# 1. Go to Workers & Pages > Your Worker
+# 2. Click "Triggers" tab
+# 3. Add a route for your Pages domain
+
+# For now, deploy without routes and configure in Dashboard
+# routes = [
+#   { pattern = "your-project.pages.dev/counter/*" }
+# ]

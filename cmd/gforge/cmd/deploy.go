@@ -148,9 +148,9 @@ var deployCmd = &cobra.Command{
         fmt.Println("    - Back4app Docs:", "https://www.back4app.com/docs-containers")
       }
       fmt.Println("    - CockroachDB (recommended):", "https://cockroachlabs.cloud/signup")
-      fmt.Println("    - CockroachDB API keys:", "https://cockroachlabs.cloud/account/api-access")
+      fmt.Println("    - CockroachDB service accounts:", "https://cockroachlabs.cloud/service-accounts")
       fmt.Println("    - Neon API keys (fallback):", "https://neon.tech/docs/manage/api-keys")
-      fmt.Println("    - Aiven tokens:", "https://docs.aiven.io/docs/platform/howto/create_authentication_token")
+      fmt.Println("    - Aiven tokens:", "https://console.aiven.io/profile/tokens")
       fmt.Println("    - Cloudflare API tokens:", "https://dash.cloudflare.com/profile/api-tokens")
     }
 
@@ -445,9 +445,9 @@ var deployCmd = &cobra.Command{
       fmt.Println("Quick links:")
       fmt.Println("  Railway: https://railway.app")
       fmt.Println("  CockroachDB (recommended): https://cockroachlabs.cloud/signup")
-      fmt.Println("  CockroachDB API keys: https://cockroachlabs.cloud/account/api-access")
+      fmt.Println("  CockroachDB service accounts: https://cockroachlabs.cloud/service-accounts")
       fmt.Println("  Neon API keys (fallback): https://neon.tech/docs/manage/api-keys")
-      fmt.Println("  Aiven tokens: https://docs.aiven.io/docs/platform/howto/create_authentication_token")
+      fmt.Println("  Aiven tokens: https://console.aiven.io/profile/tokens")
       fmt.Println("  Cloudflare API tokens: https://dash.cloudflare.com/profile/api-tokens")
       return nil
     }
@@ -702,9 +702,9 @@ func interactiveEnvSetup() error {
   tokens := []tok{
     {"RAILWAY_API_TOKEN", "Railway API tokens", "https://railway.app/account/tokens"},
     {"RAILWAY_TOKEN", "Railway Project token", "https://railway.app"},
-    {"COCKROACH_API_KEY", "CockroachDB API key (recommended)", "https://cockroachlabs.cloud/account/api-access"},
+    {"COCKROACH_API_KEY", "CockroachDB service account (recommended)", "https://cockroachlabs.cloud/service-accounts"},
     {"NEON_TOKEN", "Neon API keys (fallback)", "https://neon.tech/docs/manage/api-keys"},
-    {"AIVEN_TOKEN", "Aiven tokens", "https://docs.aiven.io/docs/platform/howto/create_authentication_token"},
+    {"AIVEN_TOKEN", "Aiven tokens", "https://console.aiven.io/profile/tokens"},
     {"CLOUDFLARE_API_TOKEN", "Cloudflare API tokens", "https://dash.cloudflare.com/profile/api-tokens"},
   }
   for _, t := range tokens {

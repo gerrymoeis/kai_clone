@@ -77,6 +77,15 @@ var exportCmd = &cobra.Command{
 		if err := copyDir("app/static", filepath.Join(outDir, "static")); err != nil { return err }
 		if err := copyDir("app/styles", filepath.Join(outDir, "static", "styles")); err != nil { return err }
 
+		// Copy functions/ directory if it exists (Cloudflare Pages Functions)
+		if _, err := os.Stat("functions"); err == nil {
+			if err := copyDir("functions", filepath.Join(outDir, "functions")); err != nil {
+				fmt.Printf("warning: failed to copy functions/: %v\n", err)
+			} else {
+				fmt.Println("  • Copied functions/ (Cloudflare Pages Functions)")
+			}
+		}
+
 		// Write Cloudflare Pages _headers for security and caching
 		if err := writeCFHeaders(outDir); err != nil {
 			fmt.Printf("warning: failed to write _headers: %v\n", err)

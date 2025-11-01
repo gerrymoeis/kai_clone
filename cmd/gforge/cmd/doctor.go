@@ -439,18 +439,85 @@ func validateDockerfile(path string) error {
   ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
   defer cancel()
   
-  // Use docker build with --dry-run to validate syntax without actually building
+  // Try with BuildKit enabled (required for --dry-run in some Docker versions)
   cmd := exec.CommandContext(ctx, "docker", "build", "--dry-run", "-f", path, ".")
+  cmd.Env = append(os.Environ(), "DOCKER_BUILDKIT=1")
   output, err := cmd.CombinedOutput()
+  
   if err != nil {
-    // Parse output for specific errors
     outStr := string(output)
-    if strings.Contains(outStr, "ERROR") || strings.Contains(outStr, "failed") {
-      return fmt.Errorf("syntax error: %s", strings.TrimSpace(outStr))
+    
+    // Check if --dry-run is not supported
+    if strings.Contains(outStr, "unknown flag") || strings.Contains(outStr, "requires BuildKit") {
+      // Fall back to basic syntax check by parsing the Dockerfile
+      return validateDockerfileSyntax(path)
     }
+    
+    // Parse output for actual syntax errors
+    if strings.Contains(outStr, "ERROR") || strings.Contains(outStr, "failed to solve") {
+      // Extract first error line for brevity
+      lines := strings.Split(outStr, "\n")
+      for _, line := range lines {
+        if strings.Contains(line, "ERROR") {
+          return fmt.Errorf("syntax error: %s", strings.TrimSpace(line))
+        }
+      }
+      return fmt.Errorf("syntax error: %s", strings.TrimSpace(outStr[:min(200, len(outStr))]))
+    }
+    
+    // Other errors (context timeout, etc)
     return err
   }
+  
   return nil
+}
+
+// validateDockerfileSyntax performs basic Dockerfile syntax validation without Docker
+func validateDockerfileSyntax(path string) error {
+  content, err := os.ReadFile(path)
+  if err != nil {
+    return err
+  }
+  
+  lines := strings.Split(string(content), "\n")
+  for i, line := range lines {
+    line = strings.TrimSpace(line)
+    
+    // Skip empty lines and comments
+    if line == "" || strings.HasPrefix(line, "#") {
+      continue
+    }
+    
+    // Check for basic Dockerfile instruction format
+    upper := strings.ToUpper(line)
+    validInstructions := []string{"FROM", "RUN", "CMD", "LABEL", "EXPOSE", "ENV", "ADD", "COPY", "ENTRYPOINT", "VOLUME", "USER", "WORKDIR", "ARG", "ONBUILD", "STOPSIGNAL", "HEALTHCHECK", "SHELL"}
+    
+    hasValidInstruction := false
+    for _, inst := range validInstructions {
+      if strings.HasPrefix(upper, inst+" ") || strings.HasPrefix(upper, inst+"\t") || upper == inst {
+        hasValidInstruction = true
+        break
+      }
+    }
+    
+    // Allow continuation lines (backslash at end of previous line)
+    if !hasValidInstruction && i > 0 && strings.HasSuffix(strings.TrimSpace(lines[i-1]), "\\") {
+      hasValidInstruction = true
+    }
+    
+    if !hasValidInstruction {
+      return fmt.Errorf("line %d: invalid instruction or format", i+1)
+    }
+  }
+  
+  return nil
+}
+
+func min(a, b int) int {
+  if a < b {
+    return a
+  }
+  return b
 }
 
 // Note: ensureDockerFiles, createDockerfile, and createDockerignore are defined in install.go

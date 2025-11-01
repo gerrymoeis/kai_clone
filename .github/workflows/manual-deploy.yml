@@ -21,8 +21,10 @@ jobs:
     runs-on: ubuntu-latest
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
-      CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}  # Backward compatibility
       CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}  # New standard
       CF_PROJECT_NAME: ${{ secrets.CF_PROJECT_NAME }}
       RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -44,11 +46,11 @@ jobs:
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
       - name: Deploy to Cloudflare Pages
-        if: ${{ inputs.deploy_pages && env.CF_API_TOKEN != '' && env.CF_ACCOUNT_ID != '' && env.CF_PROJECT_NAME != '' }}
+        if: ${{ inputs.deploy_pages && (env.CLOUDFLARE_API_TOKEN != '' || env.CF_API_TOKEN != '') && (env.CLOUDFLARE_ACCOUNT_ID != '' || env.CF_ACCOUNT_ID != '') && env.CF_PROJECT_NAME != '' }}
         uses: cloudflare/pages-action@v1
         with:
-          apiToken: ${{ env.CF_API_TOKEN }}
-          accountId: ${{ env.CF_ACCOUNT_ID }}
+          apiToken: ${{ env.CLOUDFLARE_API_TOKEN || env.CF_API_TOKEN }}
+          accountId: ${{ env.CLOUDFLARE_ACCOUNT_ID || env.CF_ACCOUNT_ID }}
           projectName: ${{ env.CF_PROJECT_NAME }}
           directory: dist
           gitHubToken: ${{ env.GITHUB_TOKEN }}

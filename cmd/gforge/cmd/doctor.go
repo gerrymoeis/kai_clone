@@ -118,6 +118,7 @@ var doctorCmd = &cobra.Command{
 
     // Docker (required for Back4app Containers)
     dockerPath, dockerOK := execx.Look("docker")
+    dockerDaemonRunning := false
     fmt.Printf("  • docker: %s\n", pathOrMissing(dockerPath, dockerOK))
     if dockerOK {
       if v, err := execx.RunCapture(context.Background(), "docker --version", "docker", "--version"); err == nil {
@@ -128,6 +129,7 @@ var doctorCmd = &cobra.Command{
       ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
       if err := execx.Run(ctx, "docker ps", "docker", "ps"); err == nil {
         fmt.Println("    → Docker daemon: running")
+        dockerDaemonRunning = true
       } else {
         fmt.Println("    → Docker daemon: not running (start Docker Desktop)")
       }
@@ -157,13 +159,15 @@ var doctorCmd = &cobra.Command{
     } else {
       fmt.Printf("  • Dockerfile: present\n")
       hasDockerfile = true
-      // Validate Dockerfile syntax if Docker is available
-      if dockerOK {
+      // Validate Dockerfile syntax only if Docker daemon is running
+      if dockerOK && dockerDaemonRunning {
         if err := validateDockerfile(dockerfilePath); err == nil {
           fmt.Println("    → Dockerfile syntax: valid")
         } else {
           fmt.Printf("    ⚠️  Dockerfile syntax check failed: %s\n", err)
         }
+      } else if dockerOK && !dockerDaemonRunning {
+        fmt.Println("    → Dockerfile syntax: not validated (Docker daemon not running)")
       }
     }
     if hasDockerfile {

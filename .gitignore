@@ -65,7 +65,7 @@ app/templates/*_templ.go
 
 # Development/Session documentation (not for public repo)
 # Keep: README.md, QUICKSTART.md, CODE_OF_CONDUCT.md, CONTRIBUTING.md, SECURITY.md, LICENSE
-# Keep: CLOUDFLARE_PAGES_GUIDE.md, functions/README.md (user-facing guides)
+# Keep: CLOUDFLARE_PAGES_GUIDE.md, CHANGELOG_v6.1.md, functions/README.md (user-facing guides)
 PHILOSOPHY.md
 ARCHITECTURE_CLOUDFLARE_WORKERS.md
 BUGFIX_API_URLS.md
@@ -81,3 +81,5 @@ TEST_FINDINGS.md
 UX_IMPROVEMENTS.md
 WORKERS_IMPLEMENTATION_PLAN.md
 QUICKSTART_OLD.md
+FINAL_STATUS.md
+V6.1_IMPLEMENTATION.md

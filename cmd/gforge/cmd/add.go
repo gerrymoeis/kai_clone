@@ -14,25 +14,15 @@ import (
 
 var addCmd = &cobra.Command{
     Use:   "add",
-    Short: "Scaffold features in app/ (page, component, auth, oauth, db, module, resource)",
+    Short: "Scaffold features in app/ (page, api, handler, model, edge, component, auth, etc.)",
     Args:  cobra.MinimumNArgs(1),
     RunE: func(cmd *cobra.Command, args []string) error {
         banner()
         kind := strings.ToLower(args[0])
         var name string
-        if kind == "page" || kind == "component" || kind == "oauth" || kind == "db" || kind == "module" || kind == "crud" || kind == "resource" || kind == "migration" || kind == "cruddb" {
+        if kind == "page" || kind == "component" || kind == "oauth" || kind == "db" || kind == "module" || kind == "crud" || kind == "resource" || kind == "migration" || kind == "cruddb" || kind == "api" || kind == "handler" || kind == "model" || kind == "edge" {
             if len(args) < 2 {
-                fmt.Println("Usage:")
-                fmt.Println("  gforge add page <name>")
-                fmt.Println("  gforge add component <name>")
-                fmt.Println("  gforge add auth")
-                fmt.Println("  gforge add oauth <provider>")
-                fmt.Println("  gforge add db <name>")
-                fmt.Println("  gforge add module <name>")
-                fmt.Println("  gforge add crud <name>")
-                fmt.Println("  gforge add resource <Name> <field:type> [field:type ...]")
-                fmt.Println("  gforge add migration <name>")
-                fmt.Println("  gforge add cruddb <Name> <field:type> [field:type ...]")
+                printAddUsage()
                 return nil
             }
             name = args[1]
@@ -43,6 +33,20 @@ var addCmd = &cobra.Command{
         switch kind {
         case "page":
             return scaffoldPage(name)
+        case "api":
+            method := "GET"
+            if len(args) > 2 { method = strings.ToUpper(args[2]) }
+            return scaffoldAPI(name, method)
+        case "handler":
+            return scaffoldHandler(name)
+        case "model":
+            fields := []string{}
+            if len(args) > 2 { fields = args[2:] }
+            return scaffoldModel(name, fields)
+        case "edge":
+            method := "GET"
+            if len(args) > 2 { method = strings.ToUpper(args[2]) }
+            return scaffoldEdge(name, method)
         case "component":
             return scaffoldComponent(name)
         case "auth":
@@ -66,20 +70,44 @@ var addCmd = &cobra.Command{
             if len(args) > 2 { fields = args[2:] }
             return scaffoldCRUDDB(name, fields)
         default:
-            fmt.Println("Usage:")
-            fmt.Println("  gforge add page <name>")
-            fmt.Println("  gforge add component <name>")
-            fmt.Println("  gforge add auth")
-            fmt.Println("  gforge add oauth <provider>")
-            fmt.Println("  gforge add db <name>")
-            fmt.Println("  gforge add module <name>")
-            fmt.Println("  gforge add crud <name>")
-            fmt.Println("  gforge add resource <Name> <field:type> [field:type ...]")
-            fmt.Println("  gforge add migration <name>")
-            fmt.Println("  gforge add cruddb <Name> <field:type> [field:type ...]")
+            printAddUsage()
             return nil
         }
     },
+}
+
+func printAddUsage() {
+    fmt.Println("Usage:")
+    fmt.Println()
+    fmt.Println("📄 Pages & UI:")
+    fmt.Println("  gforge add page <name>            - Add HTML page with route")
+    fmt.Println("  gforge add component <name>       - Add reusable component")
+    fmt.Println()
+    fmt.Println("🚀 API & Routes:")
+    fmt.Println("  gforge add api <name> [method]    - Add API endpoint (default: GET)")
+    fmt.Println("  gforge add handler <name>         - Add route handler")
+    fmt.Println("  gforge add edge <path> [method]   - Add Cloudflare edge function")
+    fmt.Println()
+    fmt.Println("🗄️  Database & Models:")
+    fmt.Println("  gforge add model <Name> [field:type ...]  - Add database model")
+    fmt.Println("  gforge add migration <name>       - Add database migration")
+    fmt.Println("  gforge add db <name>              - Add database schema file")
+    fmt.Println()
+    fmt.Println("✨ Full Features:")
+    fmt.Println("  gforge add crud <name>            - Add memory-backed CRUD")
+    fmt.Println("  gforge add cruddb <Name> [field:type ...]  - Add DB-backed CRUD")
+    fmt.Println("  gforge add resource <Name> [field:type ...]  - Add page + migration")
+    fmt.Println("  gforge add module <name>          - Add page + db schema")
+    fmt.Println()
+    fmt.Println("🔐 Authentication:")
+    fmt.Println("  gforge add auth                   - Add login/logout routes")
+    fmt.Println("  gforge add oauth <provider>       - Add OAuth provider routes")
+    fmt.Println()
+    fmt.Println("Examples:")
+    fmt.Println("  gforge add api users GET")
+    fmt.Println("  gforge add model Post title:string body:text")
+    fmt.Println("  gforge add edge /api/hello POST")
+    fmt.Println("  gforge add cruddb Article title:string content:text")
 }
 
 // scaffoldOAuth creates placeholder OAuth routes for a provider.
@@ -790,5 +818,352 @@ func requireJWT(r *http.Request) bool { _, err := auth.ReadAndVerifyCookie(r, "g
     fmt.Printf("Added CRUD: /%s (memory-backed; POST/PUT/DELETE require JWT)\n", keb)
     fmt.Printf("  - %s\n", tmplPath)
     fmt.Printf("  - %s\n", routePath)
+    return nil
+}
+
+// scaffoldAPI creates a JSON API endpoint.
+// Example: gforge add api users GET
+func scaffoldAPI(name string, method string) error {
+    keb := kebabCase(name)
+    pas := pascalCase(name)
+    routePath := filepath.Join("app", "routes", fmt.Sprintf("api_%s.go", keb))
+    
+    methodLower := strings.ToLower(method)
+    chiMethod := strings.Title(methodLower)
+    
+    routeSrc := fmt.Sprintf(`package routes
+
+import (
+    "encoding/json"
+    "net/http"
+    "github.com/go-chi/chi/v5"
+)
+
+func init() {
+    RegisterRoute(func(r chi.Router) {
+        r.%s("/api/%s", handle%sAPI)
+        RegisterURL("/api/%s")
+    })
+}
+
+func handle%sAPI(w http.ResponseWriter, r *http.Request) {
+    w.Header().Set("Content-Type", "application/json; charset=utf-8")
+    
+    // TODO: Implement your API logic here
+    response := map[string]interface{}{
+        "success": true,
+        "message": "%s API endpoint",
+        "method":  "%s",
+    }
+    
+    _ = json.NewEncoder(w).Encode(response)
+}
+`, chiMethod, keb, pas, keb, pas, pas, method)
+    
+    if err := execx.WriteFileIfMissing(routePath, []byte(routeSrc), 0o644); err != nil { return err }
+    
+    fmt.Printf("Added API endpoint: %s /api/%s\n", method, keb)
+    fmt.Printf("  - %s\n", routePath)
+    return nil
+}
+
+// scaffoldHandler creates a generic route handler.
+// Example: gforge add handler dashboard
+func scaffoldHandler(name string) error {
+    keb := kebabCase(name)
+    pas := pascalCase(name)
+    routePath := filepath.Join("app", "routes", fmt.Sprintf("handler_%s.go", keb))
+    
+    routeSrc := fmt.Sprintf(`package routes
+
+import (
+    "net/http"
+    "github.com/go-chi/chi/v5"
+)
+
+func init() {
+    RegisterRoute(func(r chi.Router) {
+        r.Get("/%s", handle%s)
+        RegisterURL("/%s")
+    })
+}
+
+func handle%s(w http.ResponseWriter, r *http.Request) {
+    w.Header().Set("Content-Type", "text/html; charset=utf-8")
+    
+    // TODO: Implement your handler logic here
+    // Option 1: Render template
+    // _ = templates.Page%s().Render(r.Context(), w)
+    
+    // Option 2: Return plain text
+    _, _ = w.Write([]byte("Handler: %s"))
+}
+`, keb, pas, keb, pas, pas, pas)
+    
+    if err := execx.WriteFileIfMissing(routePath, []byte(routeSrc), 0o644); err != nil { return err }
+    
+    fmt.Printf("Added handler: /%s\n", keb)
+    fmt.Printf("  - %s\n", routePath)
+    return nil
+}
+
+// scaffoldModel creates a database model struct and repository.
+// Example: gforge add model Post title:string body:text published:bool
+func scaffoldModel(name string, fields []string) error {
+    pas := pascalCase(name)
+    keb := kebabCase(name)
+    
+    // Parse fields
+    type fieldInfo struct {
+        Name    string
+        GoType  string
+        SQLType string
+        JSONTag string
+    }
+    
+    parsedFields := []fieldInfo{}
+    for _, f := range fields {
+        parts := strings.SplitN(strings.TrimSpace(f), ":", 2)
+        if len(parts) != 2 || parts[0] == "" {
+            continue
+        }
+        
+        fieldName := pascalCase(parts[0])
+        fieldType := strings.ToLower(strings.TrimSpace(parts[1]))
+        
+        var goType, sqlType string
+        switch fieldType {
+        case "string", "text":
+            goType = "string"
+            sqlType = "text"
+        case "int", "integer":
+            goType = "int64"
+            sqlType = "bigint"
+        case "bool", "boolean":
+            goType = "bool"
+            sqlType = "boolean"
+        case "float", "double":
+            goType = "float64"
+            sqlType = "double precision"
+        case "time", "timestamp":
+            goType = "time.Time"
+            sqlType = "timestamptz"
+        default:
+            goType = "string"
+            sqlType = "text"
+        }
+        
+        parsedFields = append(parsedFields, fieldInfo{
+            Name:    fieldName,
+            GoType:  goType,
+            SQLType: sqlType,
+            JSONTag: strings.ToLower(parts[0]),
+        })
+    }
+    
+    // Generate struct fields
+    var structFields strings.Builder
+    for _, f := range parsedFields {
+        structFields.WriteString(fmt.Sprintf("\t%s %s `json:\"%s\"`\n", f.Name, f.GoType, f.JSONTag))
+    }
+    
+    // Create model file
+    modelPath := filepath.Join("app", "models", fmt.Sprintf("%s.go", keb))
+    if err := os.MkdirAll(filepath.Dir(modelPath), 0o755); err != nil {
+        return err
+    }
+    
+    modelSrc := fmt.Sprintf(`package models
+
+import (
+	"context"
+	"time"
+	
+	"gothicforge3/internal/db"
+)
+
+// %s represents a %s entity
+type %s struct {
+	ID        int64     ` + "`json:\"id\"`" + `
+%s	CreatedAt time.Time ` + "`json:\"created_at\"`" + `
+	UpdatedAt time.Time ` + "`json:\"updated_at\"`" + `
+}
+
+// %sRepository handles database operations for %s
+type %sRepository struct{}
+
+// New%sRepository creates a new repository instance
+func New%sRepository() *%sRepository {
+	return &%sRepository{}
+}
+
+// FindByID retrieves a %s by ID
+func (repo *%sRepository) FindByID(ctx context.Context, id int64) (*%s, error) {
+	// TODO: Implement database query
+	// Example:
+	// query := "SELECT * FROM %ss WHERE id = $1"
+	// row := db.Pool().QueryRow(ctx, query, id)
+	// var item %s
+	// err := row.Scan(&item.ID, &item.CreatedAt, &item.UpdatedAt)
+	// return &item, err
+	return nil, nil
+}
+
+// FindAll retrieves all %ss
+func (repo *%sRepository) FindAll(ctx context.Context, limit int) ([]*%s, error) {
+	// TODO: Implement database query
+	return nil, nil
+}
+
+// Create inserts a new %s
+func (repo *%sRepository) Create(ctx context.Context, item *%s) error {
+	// TODO: Implement database insert
+	return nil
+}
+
+// Update modifies an existing %s
+func (repo *%sRepository) Update(ctx context.Context, item *%s) error {
+	// TODO: Implement database update
+	return nil
+}
+
+// Delete removes a %s by ID
+func (repo *%sRepository) Delete(ctx context.Context, id int64) error {
+	// TODO: Implement database delete
+	return nil
+}
+`, pas, keb, pas, structFields.String(), pas, pas, pas, pas, pas, pas, pas, keb, pas, pas, keb, pas, pas, pas, pas, keb, pas, pas, keb, pas, pas)
+    
+    if err := execx.WriteFileIfMissing(modelPath, []byte(modelSrc), 0o644); err != nil { return err }
+    
+    fmt.Printf("Added model: %s\n", pas)
+    fmt.Printf("  - %s\n", modelPath)
+    fmt.Println()
+    fmt.Println("Next steps:")
+    fmt.Println("  1. Create migration: gforge add migration create_" + keb + "s")
+    fmt.Println("  2. Implement repository methods in " + modelPath)
+    return nil
+}
+
+// scaffoldEdge creates a Cloudflare Pages Function directly.
+// Example: gforge add edge /api/hello POST
+func scaffoldEdge(path string, method string) error {
+    // Validate path
+    if !strings.HasPrefix(path, "/") {
+        path = "/" + path
+    }
+    
+    // Convert path to file structure
+    // /api/users -> functions/api/users.js
+    // /hello -> functions/hello.js
+    cleanPath := strings.TrimPrefix(path, "/")
+    parts := strings.Split(cleanPath, "/")
+    
+    var filePath string
+    functionsDir := "functions"
+    
+    if len(parts) == 1 {
+        filePath = filepath.Join(functionsDir, parts[0]+".js")
+    } else {
+        dir := filepath.Join(functionsDir, filepath.Join(parts[:len(parts)-1]...))
+        if err := os.MkdirAll(dir, 0o755); err != nil {
+            return err
+        }
+        filePath = filepath.Join(dir, parts[len(parts)-1]+".js")
+    }
+    
+    // Generate JavaScript
+    methodLower := strings.ToLower(method)
+    handlerName := fmt.Sprintf("onRequest%s", strings.Title(methodLower))
+    
+    jsSrc := fmt.Sprintf(`/**
+ * Cloudflare Pages Function: %s
+ * 
+ * Method: %s
+ * Path: %s
+ * 
+ * Created by: gforge add edge
+ */
+
+export async function %s(context) {
+  try {
+    // Extract URL parameters
+    const url = new URL(context.request.url);
+    const params = Object.fromEntries(url.searchParams);
+`, path, method, path, handlerName)
+    
+    if methodLower == "post" || methodLower == "put" || methodLower == "patch" {
+        jsSrc += `
+    // Parse request body
+    const contentType = context.request.headers.get('Content-Type') || '';
+    let body;
+    
+    if (contentType.includes('application/json')) {
+      body = await context.request.json();
+    } else if (contentType.includes('application/x-www-form-urlencoded')) {
+      const formData = await context.request.formData();
+      body = Object.fromEntries(formData);
+    } else {
+      body = await context.request.text();
+    }
+`
+    }
+    
+    jsSrc += `
+    // TODO: Implement your logic here
+    const response = {
+      success: true,
+      message: 'Edge function response',
+      method: '` + method + `',
+      path: '` + path + `',
+    };
+    
+    return new Response(
+      JSON.stringify(response),
+      {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+        },
+      }
+    );
+  } catch (error) {
+    return new Response(
+      JSON.stringify({ 
+        success: false, 
+        error: error.message 
+      }),
+      {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' },
+      }
+    );
+  }
+}
+
+// Handle CORS preflight
+export async function onRequestOptions(context) {
+  return new Response(null, {
+    status: 204,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': '` + method + `, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      'Access-Control-Max-Age': '86400',
+    },
+  });
+}
+`
+    
+    if err := execx.WriteFileIfMissing(filePath, []byte(jsSrc), 0o644); err != nil { return err }
+    
+    fmt.Printf("Added edge function: %s %s\n", method, path)
+    fmt.Printf("  - %s\n", filePath)
+    fmt.Println()
+    fmt.Println("Next steps:")
+    fmt.Println("  1. Implement logic in " + filePath)
+    fmt.Println("  2. Export: gforge export")
+    fmt.Println("  3. Deploy: gforge deploy pages --run")
     return nil
 }

@@ -12,6 +12,7 @@ import (
   "path/filepath"
   "runtime"
   "strings"
+  "time"
 
   "github.com/spf13/cobra"
   "gothicforge3/internal/execx"
@@ -38,15 +39,48 @@ var deployPagesCmd = &cobra.Command{
     // 2) Try wrangler CLI, else attempt install if requested, otherwise provide guidance
     if p, ok := execx.Look("wrangler"); ok {
       fmt.Println("wrangler found:", p)
+      
+      // Pre-flight check: List existing projects if creating new one
+      if strings.TrimSpace(pagesProject) != "" && pagesDeployRun {
+        fmt.Println()
+        fmt.Println("🔍 Checking Cloudflare Pages projects...")
+        checkCtx, checkCancel := context.WithTimeout(context.Background(), 10*time.Second)
+        listOut, listErr := exec.CommandContext(checkCtx, "wrangler", "pages", "project", "list").CombinedOutput()
+        checkCancel()
+        if listErr == nil && len(listOut) > 0 {
+          fmt.Println(string(listOut))
+          fmt.Println("💡 Tip: If you see error 8000000, you may have reached project limit.")
+          fmt.Println("   Delete unused projects or try a different name.")
+          fmt.Println()
+        }
+      }
+      
       args := []string{"pages", "deploy", pagesOutDir, "--commit-dirty=true"}
       if strings.TrimSpace(pagesProject) != "" { args = append(args, "--project-name", pagesProject) }
       if pagesDeployRun {
         fmt.Println("Running:", "wrangler "+strings.Join(args, " "))
+        fmt.Println()
         ctx := context.Background()
+        var deployErr error
         if strings.TrimSpace(pagesProject) != "" {
-          if err := execx.RunInteractive(ctx, "wrangler pages deploy", "wrangler", "pages", "deploy", pagesOutDir, "--commit-dirty=true", "--project-name", pagesProject); err != nil { return err }
+          deployErr = execx.RunInteractive(ctx, "wrangler pages deploy", "wrangler", "pages", "deploy", pagesOutDir, "--commit-dirty=true", "--project-name", pagesProject)
         } else {
-          if err := execx.RunInteractive(ctx, "wrangler pages deploy", "wrangler", "pages", "deploy", pagesOutDir, "--commit-dirty=true"); err != nil { return err }
+          deployErr = execx.RunInteractive(ctx, "wrangler pages deploy", "wrangler", "pages", "deploy", pagesOutDir, "--commit-dirty=true")
+        }
+        
+        // Enhanced error handling
+        if deployErr != nil {
+          fmt.Println()
+          fmt.Println("❌ Deployment failed!")
+          fmt.Println()
+          fmt.Println("Common solutions for error 8000000:")
+          fmt.Println("  1. Check project limit: wrangler pages project list")
+          fmt.Println("  2. Delete old projects via Cloudflare Dashboard")
+          fmt.Println("  3. Try different project name: --project=my-app-v2")
+          fmt.Println("  4. Verify account at: https://dash.cloudflare.com/")
+          fmt.Println()
+          fmt.Println("📖 Full troubleshooting guide: CLOUDFLARE_PAGES_TROUBLESHOOTING.md")
+          return deployErr
         }
       } else {
         fmt.Println("Dry-run. To deploy with wrangler:")

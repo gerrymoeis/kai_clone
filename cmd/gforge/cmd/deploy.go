@@ -697,13 +697,10 @@ func interactiveEnvSetup() error {
       fmt.Println("    → JWT_SECRET regenerated")
     }
   }
-  // 3) Provider tokens with links shown inline
+  // 3) Provider tokens with links shown inline (Opinionated Stack only)
   type tok struct{ key, label, link string }
   tokens := []tok{
-    {"RAILWAY_API_TOKEN", "Railway API tokens", "https://railway.app/account/tokens"},
-    {"RAILWAY_TOKEN", "Railway Project token", "https://railway.app"},
-    {"COCKROACH_API_KEY", "CockroachDB service account (recommended)", "https://cockroachlabs.cloud/service-accounts"},
-    {"NEON_TOKEN", "Neon API keys (fallback)", "https://neon.tech/docs/manage/api-keys"},
+    {"COCKROACH_API_KEY", "CockroachDB service account", "https://cockroachlabs.cloud/service-accounts"},
     {"AIVEN_TOKEN", "Aiven tokens", "https://console.aiven.io/profile/tokens"},
     {"CLOUDFLARE_API_TOKEN", "Cloudflare API tokens", "https://dash.cloudflare.com/profile/api-tokens"},
   }

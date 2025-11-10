@@ -35,23 +35,23 @@ var (
   deployNeonDBName  string
   deployNeonUser    string
   deployNeonPass    string
-  deployProvider    string // "railway" or "back4app"
+  deployProvider    string // "railway", "back4app", or "leapcell"
 )
 
 var deployCmd = &cobra.Command{
   Use:   "deploy",
-  Short: "Deploy using omakase stack (Railway/Back4app, Neon, Valkey, Cloudflare)",
+  Short: "Deploy using omakase stack (Leapcell/Back4app/Railway + Cloudflare Pages)",
   RunE: func(cmd *cobra.Command, args []string) error {
     banner()
     _ = env.Load() // ensure .env is loaded for both normal and --dry-run flows
     
-    // Normalize provider selection (default to railway for backward compatibility)
+    // Normalize provider selection (default to back4app for new users, leapcell recommended)
     deployProvider = strings.ToLower(strings.TrimSpace(deployProvider))
     if deployProvider == "" {
-      deployProvider = "railway"
+      deployProvider = "leapcell" // v7.0: Leapcell is now default (best free tier)
     }
-    if deployProvider != "railway" && deployProvider != "back4app" {
-      return fmt.Errorf("invalid provider: %s (must be 'railway' or 'back4app')", deployProvider)
+    if deployProvider != "railway" && deployProvider != "back4app" && deployProvider != "leapcell" {
+      return fmt.Errorf("invalid provider: %s (must be 'railway', 'back4app', or 'leapcell')", deployProvider)
     }
     
     if deployCheck {
@@ -76,6 +76,9 @@ var deployCmd = &cobra.Command{
       required = []string{"RAILWAY_TOKEN", "AIVEN_TOKEN", "CLOUDFLARE_API_TOKEN"}
     case "back4app":
       required = []string{"AIVEN_TOKEN", "CLOUDFLARE_API_TOKEN"}
+    case "leapcell":
+      // Leapcell: manual setup via dashboard, only needs Cloudflare for Pages
+      required = []string{"CLOUDFLARE_API_TOKEN"}
     }
     
     missing := []string{}
@@ -129,6 +132,13 @@ var deployCmd = &cobra.Command{
       } else {
         fmt.Println("    - B4A_APP_URL:", b4aURL)
       }
+    case "leapcell":
+      leapURL := os.Getenv("LEAPCELL_APP_URL")
+      if leapURL == "" {
+        fmt.Println("    - LEAPCELL_APP_URL: not set (will be saved after guided setup)")
+      } else {
+        fmt.Println("    - LEAPCELL_APP_URL:", leapURL)
+      }
     }
     
     if siteBase == "" {
@@ -146,6 +156,10 @@ var deployCmd = &cobra.Command{
       case "back4app":
         fmt.Println("    - Back4app:", "https://www.back4app.com/signup")
         fmt.Println("    - Back4app Docs:", "https://www.back4app.com/docs-containers")
+      case "leapcell":
+        fmt.Println("    - Leapcell:", "https://leapcell.io/signup")
+        fmt.Println("    - Leapcell Docs:", "https://docs.leapcell.io/")
+        fmt.Println("    - 🎁 20 FREE projects on Hobby tier!")
       }
       fmt.Println("    - CockroachDB (recommended):", "https://cockroachlabs.cloud/signup")
       fmt.Println("    - CockroachDB service accounts:", "https://cockroachlabs.cloud/service-accounts")
@@ -347,6 +361,21 @@ var deployCmd = &cobra.Command{
       
       // Provider-specific deployment logic
       switch deployProvider {
+      case "leapcell":
+        // Leapcell: guided setup workflow (v7.0 default)
+        fmt.Println("  • Compute Provider: Leapcell (20 free projects!)")
+        ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+        defer cancel()
+        if err := runLeapcellDeploy(ctx, reader, false); err != nil {
+          fmt.Println("  • Leapcell setup error:", err)
+          fmt.Println("────────────────────────────────────────")
+          fmt.Println("Fix the issues above and re-run: gforge deploy --provider=leapcell")
+        } else {
+          fmt.Println("────────────────────────────────────────")
+          fmt.Println("Deployment complete. Your app is live on Leapcell!")
+        }
+        return nil
+      
       case "back4app":
         // Back4app Containers: guided setup workflow
         fmt.Println("  • Compute Provider: Back4app Containers")

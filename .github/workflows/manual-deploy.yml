@@ -7,10 +7,6 @@ on:
         description: Deploy to Cloudflare Pages
         type: boolean
         default: true
-      deploy_railway:
-        description: Deploy to Railway
-        type: boolean
-        default: false
       run_migrations:
         description: Run DB migrations (requires DATABASE_URL secret)
         type: boolean
@@ -26,7 +22,6 @@ jobs:
       CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}  # New standard
       CF_PROJECT_NAME: ${{ secrets.CF_PROJECT_NAME }}
-      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v4
@@ -54,24 +49,8 @@ jobs:
           projectName: ${{ env.CF_PROJECT_NAME }}
           directory: dist
           gitHubToken: ${{ env.GITHUB_TOKEN }}
-      - name: Install Railway CLI
-        if: ${{ inputs.deploy_railway && env.RAILWAY_TOKEN != '' }}
+      - name: Deployment complete
         run: |
-          ARCH=$(uname -m)
-          if [ "$ARCH" = "x86_64" ] || [ "$ARCH" = "amd64" ]; then
-            RARCH=amd64
-          elif [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then
-            RARCH=arm64
-          else
-            echo "Unknown arch $ARCH; defaulting to amd64"
-            RARCH=amd64
-          fi
-          echo "Installing Railway CLI for linux-$RARCH"
-          sudo curl -fsSL -o /usr/local/bin/railway "https://github.com/railwayapp/cli/releases/latest/download/railway-linux-$RARCH"
-          sudo chmod +x /usr/local/bin/railway
-          railway --version
-      - name: Railway deploy (up)
-        if: ${{ inputs.deploy_railway && env.RAILWAY_TOKEN != '' }}
-        run: railway up --detach
-        env:
-          RAILWAY_TOKEN: ${{ env.RAILWAY_TOKEN }}
+          echo "✅ Static site deployed to Cloudflare Pages"
+          echo "📝 Note: Back4app Containers auto-deploy from GitHub pushes"
+          echo "🔗 View logs at https://dashboard.back4app.com"

@@ -68,20 +68,48 @@ var installCmd = &cobra.Command{
         if _, err := os.Stat(envExamplePath); os.IsNotExist(err) {
             if err := writeEnvExample(envExamplePath); err != nil { return err }
         }
+        
+        // Create .env by copying .env.example if it doesn't exist
         envPath := filepath.Join(".env")
         if _, err := os.Stat(envPath); os.IsNotExist(err) {
-            // minimal default
-            const minimal = "APP_ENV=development\nSITE_BASE_URL=http://127.0.0.1:8080\n"
-            if err := os.WriteFile(envPath, []byte(minimal), 0o644); err != nil { return err }
+            // Copy from .env.example
+            if exampleContent, err := os.ReadFile(envExamplePath); err == nil {
+                if err := os.WriteFile(envPath, exampleContent, 0o644); err != nil { return err }
+            } else {
+                // Fallback: create minimal .env
+                const minimal = "APP_ENV=development\nSITE_BASE_URL=http://127.0.0.1:8080\nJWT_SECRET=\n"
+                if err := os.WriteFile(envPath, []byte(minimal), 0o644); err != nil { return err }
+            }
         }
-        // Ensure JWT_SECRET exists in .env
+        
+        // Ensure JWT_SECRET has a value in .env (not just empty)
         if b, err := os.ReadFile(envPath); err == nil {
-            if !strings.Contains(string(b), "JWT_SECRET=") {
+            content := string(b)
+            // Check if JWT_SECRET is missing or empty
+            needsSecret := !strings.Contains(content, "JWT_SECRET=") || 
+                          strings.Contains(content, "JWT_SECRET=\n") ||
+                          strings.Contains(content, "JWT_SECRET=\r\n")
+            
+            if needsSecret {
                 sec := genHex(32)
-                f, err := os.OpenFile(envPath, os.O_APPEND|os.O_WRONLY, 0o644)
-                if err == nil {
-                    defer f.Close()
-                    _, _ = f.WriteString("JWT_SECRET=" + sec + "\n")
+                lines := strings.Split(content, "\n")
+                updated := false
+                for i, line := range lines {
+                    if strings.HasPrefix(strings.TrimSpace(line), "JWT_SECRET=") {
+                        lines[i] = "JWT_SECRET=" + sec
+                        updated = true
+                        break
+                    }
+                }
+                if updated {
+                    _ = os.WriteFile(envPath, []byte(strings.Join(lines, "\n")), 0o644)
+                } else {
+                    // Append if not found
+                    f, err := os.OpenFile(envPath, os.O_APPEND|os.O_WRONLY, 0o644)
+                    if err == nil {
+                        defer f.Close()
+                        _, _ = f.WriteString("\nJWT_SECRET=" + sec + "\n")
+                    }
                 }
             }
         }
@@ -130,15 +158,15 @@ var installCmd = &cobra.Command{
         // Check for external deployment tools and provide guidance
         fmt.Println("")
         fmt.Println("🔍 Checking deployment tools (optional):")
-        checkExternalTool("Railway CLI", "railway", "npm install -g railway", "https://docs.railway.app/guides/cli")
         checkExternalTool("Cloudflare Wrangler", "wrangler", "npm install -g wrangler", "https://developers.cloudflare.com/workers/wrangler/install-and-update/")
         checkExternalTool("Docker", "docker", "", "https://docs.docker.com/get-docker/")
         
         fmt.Println("")
-        fmt.Println("💡 These tools are needed for production deployment:")
-        fmt.Println("   • Railway CLI - for Railway deployments")
-        fmt.Println("   • Wrangler - for Cloudflare Pages/Workers")
-        fmt.Println("   • Docker - for Back4app Containers (optional)")
+        fmt.Println("💡 Gothic Forge Opinionated Stack:")
+        fmt.Println("   • Cloudflare Pages + Functions - static hosting + edge compute")
+        fmt.Println("   • Back4app Containers - Go backend compute (requires Docker)")
+        fmt.Println("   • CockroachDB Serverless - PostgreSQL database")
+        fmt.Println("   • Aiven Valkey - Redis-compatible cache")
         fmt.Println("")
         fmt.Println("✅ Run 'gforge doctor' to see full system check")
         fmt.Println("✅ Run 'gforge dev' to start development server")

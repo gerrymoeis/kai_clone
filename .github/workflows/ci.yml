@@ -74,7 +74,6 @@ jobs:
       CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}  # New standard
       CF_PROJECT_NAME: ${{ secrets.CF_PROJECT_NAME }}
-      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v4
@@ -88,7 +87,7 @@ jobs:
         env:
           GFORGE_SKIP_TOOLS: "1"
           LOG_FORMAT: off
-      - name: Run DB migrations (Neon)
+      - name: Run DB migrations
         if: ${{ env.DATABASE_URL != '' }}
         run: go run ./cmd/gforge db --migrate
         env:
@@ -102,14 +101,9 @@ jobs:
           projectName: ${{ env.CF_PROJECT_NAME }}
           directory: dist
           gitHubToken: ${{ env.GITHUB_TOKEN }}
-      - name: Install Railway CLI
-        if: ${{ env.RAILWAY_TOKEN != '' }}
+      - name: Deployment summary
         run: |
-          sudo curl -fsSL -o /usr/local/bin/railway https://github.com/railwayapp/cli/releases/latest/download/railway-linux-amd64
-          sudo chmod +x /usr/local/bin/railway
-          railway --version
-      - name: Railway deploy (up)
-        if: ${{ env.RAILWAY_TOKEN != '' }}
-        run: railway up --detach
-        env:
-          RAILWAY_TOKEN: ${{ env.RAILWAY_TOKEN }}
+          echo "✅ CI/CD Pipeline Complete"
+          echo "📦 Static site deployed to Cloudflare Pages"
+          echo "🐳 Back4app auto-deploys from GitHub (connect repo in dashboard)"
+          echo "🔗 Dashboard: https://dashboard.back4app.com"

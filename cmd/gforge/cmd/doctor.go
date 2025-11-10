@@ -72,29 +72,8 @@ var doctorCmd = &cobra.Command{
       }
     }
 
-    // Provider CLIs
-    // Railway
-    railPath, railOK := execx.Look("railway")
-    fmt.Printf("  • railway: %s\n", pathOrMissing(railPath, railOK))
-    if railOK {
-      if v, err := execx.RunCapture(context.Background(), "railway --version", "railway", "--version"); err == nil {
-        v = strings.TrimSpace(v)
-        if v != "" { fmt.Printf("    → %s\n", v) }
-      }
-    } else if doctorFix {
-      if p, err := ensureRailwayCLI(); err == nil {
-        railPath, railOK = p, true
-        fmt.Printf("    → installed railway: %s\n", p)
-        if v, err := execx.RunCapture(context.Background(), "railway --version", p, "--version"); err == nil {
-          v = strings.TrimSpace(v)
-          if v != "" { fmt.Printf("    → %s\n", v) }
-        }
-      } else {
-        fmt.Println("    → failed to install railway:", err)
-      }
-    }
-
-    // Wrangler
+    // Provider CLIs (Opinionated Stack)
+    // Wrangler (for Cloudflare Pages)
     wrPath, wrOK := execx.Look("wrangler")
     fmt.Printf("  • wrangler: %s\n", pathOrMissing(wrPath, wrOK))
     if wrOK {
@@ -312,64 +291,48 @@ func pathOrMissing(p string, ok bool) string {
 }
 
 func writeEnvExample(p string) error {
-  const content = `# Gothic Forge v3 - Environment Template
+  // Read from the canonical .env.example file in the repository
+  // This ensures consistency between the template and what gforge generates
+  templatePath := ".env.example"
+  
+  // Check if template exists
+  if _, err := os.Stat(templatePath); err == nil {
+    // Copy template to target location
+    content, err := os.ReadFile(templatePath)
+    if err != nil {
+      return fmt.Errorf("failed to read .env.example template: %w", err)
+    }
+    return os.WriteFile(p, content, 0o644)
+  }
+  
+  // Fallback: generate minimal template if .env.example doesn't exist
+  const minimalContent = `# Gothic Forge v3 - Environment Template
 # Copy this file to .env and fill only what's necessary.
-# Notes:
-# - APP_ENV: development | production
-# - In production, CSRF middleware is enabled and CSP is stricter.
-# - All development happens in /app; gforge handles tooling and build.
+#
+# Gothic Forge Opinionated Stack:
+# - Cloudflare Pages + Functions (static hosting + edge compute)
+# - Back4app Containers (Go backend compute)
+# - CockroachDB Serverless (PostgreSQL-compatible database)
+# - Aiven Valkey (Redis-compatible cache)
 
-# App
 APP_ENV=development
 SITE_BASE_URL=http://127.0.0.1:8080
-JWT_SECRET=devsecret-change-me
-
-# Server
 HTTP_HOST=127.0.0.1
 HTTP_PORT=8080
-# LOG_FORMAT: empty for human logs, or 'json' for structured logs
-LOG_FORMAT=
+JWT_SECRET=
 
-# Rate limiting (per IP)
-RATE_LIMIT_MAX=120
-RATE_LIMIT_WINDOW_SECONDS=60
-
-# CORS
-# Comma-separated list (e.g., https://example.com,https://app.example.com)
-# Use '*' only for local development. When '*' is used, credentials are disabled.
-CORS_ORIGINS=
-
-# Service URLs (populated by deploy or your provider)
 DATABASE_URL=
 VALKEY_URL=
 
-# OAuth (optional)
-# If set, GitHub OAuth login will be enabled at /auth/github/login
-GITHUB_CLIENT_ID=
-GITHUB_CLIENT_SECRET=
-# Base URL used to compute OAuth callback, defaults to SITE_BASE_URL
-OAUTH_BASE_URL=
-
-# Deploy provider tokens (used by 'gforge deploy')
-RAILWAY_TOKEN=
-NEON_TOKEN=
+# Deployment tokens
+B4A_APP_URL=
+COCKROACH_API_KEY=
 AIVEN_TOKEN=
-CF_API_TOKEN=
+CLOUDFLARE_API_TOKEN=
 
-# Provider signup and token/help links
-# Railway: https://railway.app
-# Neon (API keys): https://neon.tech/docs/manage/api-keys
-# Aiven Console: https://console.aiven.io/
-# Aiven API tokens: https://docs.aiven.io/docs/platform/howto/create_authentication_token
-# Cloudflare Pages: https://pages.cloudflare.com/
-# Cloudflare API tokens: https://dash.cloudflare.com/profile/api-tokens
-
-# Security notes
-# - CSRF: automatically enforced when APP_ENV=production
-# - CSP: allows unpkg.com & cdn.jsdelivr.net and inline JSON-LD for SEO
-# - Sessions: cookie SameSite=Lax, Secure in production
+# For full configuration options, see: https://github.com/yourusername/gothic-forge
 `
-  return os.WriteFile(p, []byte(content), 0o644)
+  return os.WriteFile(p, []byte(minimalContent), 0o644)
 }
 
 func readEnvKey(path, key string) string {

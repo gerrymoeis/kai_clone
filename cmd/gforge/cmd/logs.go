@@ -1,11 +1,8 @@
 package cmd
 
 import (
-  "context"
   "fmt"
-  "strings"
   "github.com/spf13/cobra"
-  "gothicforge3/internal/execx"
 )
 
 var (
@@ -15,25 +12,32 @@ var (
 
 var logsCmd = &cobra.Command{
   Use:   "logs",
-  Short: "Tail application logs (provider-integrated)",
+  Short: "View application logs",
+  Long: `View application logs for your deployed Gothic Forge app.
+
+Gothic Forge uses Back4app Containers for backend compute.
+View your application logs in the Back4app dashboard:
+
+  1. Log in to https://dashboard.back4app.com
+  2. Select your app
+  3. Go to "Logs" tab
+  4. View real-time logs and filter by severity
+
+Local development logs are shown in the terminal when running 'gforge dev'.`,
   RunE: func(cmd *cobra.Command, args []string) error {
     banner()
-    ctx := context.Background()
-    if _, ok := execx.Look("railway"); !ok {
-      fmt.Println("Railway CLI not found.")
-      printRailwayInstallHelp()
-      return nil
-    }
-    if !isRailwayLinkedCLI(ctx) {
-      fmt.Println("No Railway project link detected. Run 'railway link' first, then re-run: gforge logs")
-      return nil
-    }
-    argv := []string{"logs"}
-    if logsFollow { argv = append(argv, "--follow") }
-    if s := strings.TrimSpace(logsSince); s != "" { argv = append(argv, "--since", s) }
-    fmt.Println("Streaming logs via Railway...")
-    full := append([]string{"railway", "logs"}, argv[1:]...)
-    if err := execx.RunInteractive(ctx, "railway logs", full...); err != nil { return err }
+    fmt.Println("Application Logs")
+    fmt.Println("────────────────────────────────────────")
+    fmt.Println("\n📊 Production Logs (Back4app):")
+    fmt.Println("  1. Visit: https://dashboard.back4app.com")
+    fmt.Println("  2. Select your app")
+    fmt.Println("  3. Go to \"Logs\" tab")
+    fmt.Println("  4. View real-time logs and metrics")
+    fmt.Println("\n🔧 Local Development Logs:")
+    fmt.Println("  Run: gforge dev")
+    fmt.Println("  Logs will stream to your terminal")
+    fmt.Println("\n💡 Tip: Add structured logging to your app:")
+    fmt.Println("  Use slog for better log management in production")
     return nil
   },
 }

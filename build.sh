@@ -41,11 +41,18 @@ echo "Generating templ templates..."
 echo "Building CSS with Tailwind..."
 gotailwindcss build -o app/styles/output.css app/styles/input.css
 
-# 5. Build Go server binary
+# 5. Copy CSS files to static directory (server serves from app/static)
+echo "Copying CSS files to static directory..."
+mkdir -p app/static/styles
+cp app/styles/output.css app/static/styles/output.css
+cp app/styles/overrides.css app/static/styles/overrides.css
+echo "CSS files copied to app/static/styles/"
+
+# 6. Build Go server binary
 echo "Building Go server..."
 go build -o server ./cmd/server
 
-# 6. Cleanup build tools
-rm -f templ gotailwindcss
+# 7. Cleanup build tools
+rm -f templ
 
 echo "Build complete! Binary: ./server"

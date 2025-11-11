@@ -198,43 +198,78 @@ func mountStatic(r *chi.Mux) {
     baseFS := http.FileServer(http.Dir(staticDir))
     
     // Wrap with MIME type middleware to fix Content-Type issues on some platforms (Leapcell, etc.)
+    // NOTE: We must wrap the ResponseWriter to prevent http.FileServer from overriding our Content-Type
     fs := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
         path := req.URL.Path
-        // Force correct MIME types for common static assets
+        
+        // Determine the correct MIME type based on file extension
+        var contentType string
         if strings.HasSuffix(path, ".css") {
-            w.Header().Set("Content-Type", "text/css; charset=utf-8")
+            contentType = "text/css; charset=utf-8"
         } else if strings.HasSuffix(path, ".js") {
-            w.Header().Set("Content-Type", "application/javascript; charset=utf-8")
+            contentType = "application/javascript; charset=utf-8"
         } else if strings.HasSuffix(path, ".json") {
-            w.Header().Set("Content-Type", "application/json; charset=utf-8")
+            contentType = "application/json; charset=utf-8"
         } else if strings.HasSuffix(path, ".png") {
-            w.Header().Set("Content-Type", "image/png")
+            contentType = "image/png"
         } else if strings.HasSuffix(path, ".jpg") || strings.HasSuffix(path, ".jpeg") {
-            w.Header().Set("Content-Type", "image/jpeg")
+            contentType = "image/jpeg"
         } else if strings.HasSuffix(path, ".gif") {
-            w.Header().Set("Content-Type", "image/gif")
+            contentType = "image/gif"
         } else if strings.HasSuffix(path, ".svg") {
-            w.Header().Set("Content-Type", "image/svg+xml")
+            contentType = "image/svg+xml"
         } else if strings.HasSuffix(path, ".webp") {
-            w.Header().Set("Content-Type", "image/webp")
+            contentType = "image/webp"
         } else if strings.HasSuffix(path, ".woff2") {
-            w.Header().Set("Content-Type", "font/woff2")
+            contentType = "font/woff2"
         } else if strings.HasSuffix(path, ".woff") {
-            w.Header().Set("Content-Type", "font/woff")
+            contentType = "font/woff"
         } else if strings.HasSuffix(path, ".ttf") {
-            w.Header().Set("Content-Type", "font/ttf")
+            contentType = "font/ttf"
         } else if strings.HasSuffix(path, ".ico") {
-            w.Header().Set("Content-Type", "image/x-icon")
+            contentType = "image/x-icon"
+        }
+        
+        // If we determined a content type, wrap the ResponseWriter to enforce it
+        if contentType != "" {
+            w = &mimeTypeResponseWriter{
+                ResponseWriter: w,
+                contentType:    contentType,
+            }
         }
         
         // Cache headers for static assets (1 year for immutable files)
-        // CDNs (Cloudflare, etc.) will respect these headers
         w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
         
         baseFS.ServeHTTP(w, req)
     })
     
     r.Handle("/static/*", http.StripPrefix("/static", fs))
+}
+
+// mimeTypeResponseWriter wraps http.ResponseWriter to prevent Content-Type override by http.FileServer
+type mimeTypeResponseWriter struct {
+    http.ResponseWriter
+    contentType    string
+    headerWritten  bool
+}
+
+func (w *mimeTypeResponseWriter) WriteHeader(statusCode int) {
+    if !w.headerWritten {
+        // Force our Content-Type before FileServer can set its own
+        w.ResponseWriter.Header().Set("Content-Type", w.contentType)
+        w.headerWritten = true
+    }
+    w.ResponseWriter.WriteHeader(statusCode)
+}
+
+func (w *mimeTypeResponseWriter) Write(b []byte) (int, error) {
+    if !w.headerWritten {
+        // Force Content-Type before implicit WriteHeader call
+        w.ResponseWriter.Header().Set("Content-Type", w.contentType)
+        w.headerWritten = true
+    }
+    return w.ResponseWriter.Write(b)
 }
 
 func detectStaticDir() string {

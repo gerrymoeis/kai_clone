@@ -85,14 +85,30 @@ var devCmd = &cobra.Command{
             }
             input := "./app/styles/tailwind.input.css"
             output := "./app/styles/output.css"
+            staticOutput := "./app/static/styles/output.css"
+            
+            // Helper function to build and copy CSS
+            buildCSS := func() {
+                _ = execx.Run(ctx, "gotailwindcss build", gwPath, "build", "-o", output, input)
+                // Copy to static directory (server serves from app/static)
+                os.MkdirAll("./app/static/styles", 0755)
+                if data, err := os.ReadFile(output); err == nil {
+                    _ = os.WriteFile(staticOutput, data, 0644)
+                }
+                // Also copy overrides.css
+                if data, err := os.ReadFile("./app/styles/overrides.css"); err == nil {
+                    _ = os.WriteFile("./app/static/styles/overrides.css", data, 0644)
+                }
+            }
+            
             // initial build
-            _ = execx.Run(ctx, "gotailwindcss build", gwPath, "build", "-o", output, input)
+            buildCSS()
             var lastMod time.Time
             for {
                 select { case <-ctx.Done(): return; default: }
                 if fi, err := os.Stat(input); err == nil {
                     if fi.ModTime().After(lastMod) {
-                        _ = execx.Run(ctx, "gotailwindcss build", gwPath, "build", "-o", output, input)
+                        buildCSS()
                         lastMod = fi.ModTime()
                     }
                 }

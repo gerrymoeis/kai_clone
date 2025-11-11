@@ -176,7 +176,7 @@ func leapcellStep4Configure(reader *bufio.Reader) error {
 	fmt.Println("")
 	fmt.Println("──────────────────────────────────────────")
 	fmt.Println("Build Command:")
-	fmt.Println("  bash build.sh")
+	fmt.Println("  sh build.sh")
 	fmt.Println("")
 	fmt.Println("──────────────────────────────────────────")
 	fmt.Println("Start Command:")

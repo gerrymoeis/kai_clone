@@ -193,13 +193,48 @@ func New() *chi.Mux {
 }
 
 func mountStatic(r *chi.Mux) {
-    // serve app/static under /static
+    // serve app/static under /static with explicit MIME types
     staticDir := detectStaticDir()
-    fs := http.StripPrefix("/static", http.FileServer(http.Dir(staticDir)))
-    r.Handle("/static/*", fs)
-    // also serve styles directly for convenience
-    styles := http.StripPrefix("/static/styles", http.FileServer(http.Dir(filepath.Join("app", "styles"))))
-    r.Handle("/static/styles/*", styles)
+    baseFS := http.FileServer(http.Dir(staticDir))
+    
+    // Wrap with MIME type middleware to fix Content-Type issues on some platforms (Leapcell, etc.)
+    fs := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+        path := req.URL.Path
+        // Force correct MIME types for common static assets
+        if strings.HasSuffix(path, ".css") {
+            w.Header().Set("Content-Type", "text/css; charset=utf-8")
+        } else if strings.HasSuffix(path, ".js") {
+            w.Header().Set("Content-Type", "application/javascript; charset=utf-8")
+        } else if strings.HasSuffix(path, ".json") {
+            w.Header().Set("Content-Type", "application/json; charset=utf-8")
+        } else if strings.HasSuffix(path, ".png") {
+            w.Header().Set("Content-Type", "image/png")
+        } else if strings.HasSuffix(path, ".jpg") || strings.HasSuffix(path, ".jpeg") {
+            w.Header().Set("Content-Type", "image/jpeg")
+        } else if strings.HasSuffix(path, ".gif") {
+            w.Header().Set("Content-Type", "image/gif")
+        } else if strings.HasSuffix(path, ".svg") {
+            w.Header().Set("Content-Type", "image/svg+xml")
+        } else if strings.HasSuffix(path, ".webp") {
+            w.Header().Set("Content-Type", "image/webp")
+        } else if strings.HasSuffix(path, ".woff2") {
+            w.Header().Set("Content-Type", "font/woff2")
+        } else if strings.HasSuffix(path, ".woff") {
+            w.Header().Set("Content-Type", "font/woff")
+        } else if strings.HasSuffix(path, ".ttf") {
+            w.Header().Set("Content-Type", "font/ttf")
+        } else if strings.HasSuffix(path, ".ico") {
+            w.Header().Set("Content-Type", "image/x-icon")
+        }
+        
+        // Cache headers for static assets (1 year for immutable files)
+        // CDNs (Cloudflare, etc.) will respect these headers
+        w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+        
+        baseFS.ServeHTTP(w, req)
+    })
+    
+    r.Handle("/static/*", http.StripPrefix("/static", fs))
 }
 
 func detectStaticDir() string {

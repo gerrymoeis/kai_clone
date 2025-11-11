@@ -39,7 +39,7 @@ echo "Generating templ templates..."
 
 # 4. Build CSS with Tailwind
 echo "Building CSS with Tailwind..."
-gotailwindcss build -o app/styles/output.css app/styles/input.css
+gotailwindcss build -o app/styles/output.css app/styles/tailwind.input.css
 
 # 5. Copy CSS files to static directory (server serves from app/static)
 echo "Copying CSS files to static directory..."

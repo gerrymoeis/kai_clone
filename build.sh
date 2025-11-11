@@ -7,6 +7,8 @@ echo "======================================"
 # Detect OS and architecture
 OS=$(uname -s | tr '[:upper:]' '[:lower:]')
 ARCH=$(uname -m)
+# Keep original arch for gotailwindcss (uses x86_64, not amd64)
+ARCH_ORIG=$(uname -m)
 case "$ARCH" in
     x86_64) ARCH="amd64" ;;
     aarch64) ARCH="arm64" ;;
@@ -26,7 +28,9 @@ echo "templ installed"
 # 2. Download and install gotailwindcss
 echo "Downloading gotailwindcss..."
 TAILWIND_VERSION="v2.1.4"
-TAILWIND_URL="https://github.com/bep/gotailwindcss/releases/download/${TAILWIND_VERSION}/gotailwindcss_${TAILWIND_VERSION}_${OS}-${ARCH}.tar.gz"
+# GitHub releases use format: gotailwindcss_v2.1.4_Linux_x86_64.tar.gz
+OS_CAPS="Linux"
+TAILWIND_URL="https://github.com/bep/gotailwindcss/releases/download/${TAILWIND_VERSION}/gotailwindcss_${TAILWIND_VERSION}_${OS_CAPS}_${ARCH_ORIG}.tar.gz"
 wget -q -O tailwind.tar.gz "$TAILWIND_URL"
 tar -xzf tailwind.tar.gz gotailwindcss
 chmod +x gotailwindcss

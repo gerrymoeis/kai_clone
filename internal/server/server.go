@@ -169,6 +169,9 @@ func New() *chi.Mux {
         r.Use(CSRFMiddleware)
     }
 
+    // HTML cache headers for public pages
+    r.Use(htmlCacheMiddleware)
+
     // Static assets (CSS/JS/images)
     mountStatic(r)
 
@@ -329,4 +332,86 @@ func jsonLoggerMiddleware(next http.Handler) http.Handler {
 			time.Now().Format(time.RFC3339), r.RemoteAddr, r.Method, r.URL.Path, ww.Status(), ww.BytesWritten(), time.Since(start).String(), r.UserAgent())
 		log.Println(entry)
 	})
+}
+
+func htmlCacheMiddleware(next http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        if r.Method != http.MethodGet && r.Method != http.MethodHead {
+            next.ServeHTTP(w, r)
+            return
+        }
+        if strings.EqualFold(strings.TrimSpace(env.Get("DISABLE_HTML_CACHE", "")), "1") ||
+            strings.EqualFold(strings.TrimSpace(env.Get("DISABLE_HTML_CACHE", "")), "true") {
+            next.ServeHTTP(w, r)
+            return
+        }
+        p := r.URL.Path
+        if strings.HasPrefix(p, "/static/") || p == "/favicon.ico" || p == "/robots.txt" || p == "/sitemap.xml" || p == "/healthz" {
+            next.ServeHTTP(w, r)
+            return
+        }
+
+        if strings.EqualFold(strings.TrimSpace(r.Header.Get("HX-Request")), "true") {
+            ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
+            next.ServeHTTP(ww, r)
+            if ww.Header().Get("Cache-Control") == "" {
+                ww.Header().Set("Cache-Control", "private, no-store")
+                addVary(ww.Header(), "Cookie")
+                addVary(ww.Header(), "Accept")
+                addVary(ww.Header(), "HX-Request")
+            }
+            return
+        }
+
+        hasSession := false
+        if sessionManager != nil {
+            if _, err := r.Cookie(sessionManager.Cookie.Name); err == nil {
+                hasSession = true
+            }
+        }
+
+        ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
+        next.ServeHTTP(ww, r)
+
+        if ww.Header().Get("Cache-Control") != "" {
+            return
+        }
+
+        ct := strings.ToLower(strings.TrimSpace(ww.Header().Get("Content-Type")))
+        if !strings.Contains(ct, "text/html") {
+            return
+        }
+
+        if hasSession {
+            ww.Header().Set("Cache-Control", "private, no-store")
+            addVary(ww.Header(), "Cookie")
+            addVary(ww.Header(), "Accept")
+            addVary(ww.Header(), "HX-Request")
+            return
+        }
+
+        ttl := 60
+        if v := strings.TrimSpace(env.Get("CACHE_PUBLIC_TTL", "")); v != "" {
+            if n, err := strconv.Atoi(v); err == nil && n >= 0 { ttl = n }
+        }
+        swr := 300
+        if v := strings.TrimSpace(env.Get("CACHE_SWREVAL_TTL", "")); v != "" {
+            if n, err := strconv.Atoi(v); err == nil && n >= 0 { swr = n }
+        }
+
+        ww.Header().Set("Cache-Control", fmt.Sprintf("public, s-maxage=%d, stale-while-revalidate=%d", ttl, swr))
+        addVary(ww.Header(), "Cookie")
+        addVary(ww.Header(), "Accept")
+    })
+}
+
+func addVary(h http.Header, v string) {
+    cur := h.Get("Vary")
+    if cur == "" { h.Set("Vary", v); return }
+    parts := strings.Split(cur, ",")
+    for i := range parts { parts[i] = strings.TrimSpace(parts[i]) }
+    for _, p := range parts {
+        if strings.EqualFold(p, v) { return }
+    }
+    h.Set("Vary", cur+", "+v)
 }

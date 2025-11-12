@@ -77,8 +77,8 @@ var deployCmd = &cobra.Command{
     case "back4app":
       required = []string{"AIVEN_TOKEN", "CLOUDFLARE_API_TOKEN"}
     case "leapcell":
-      // Leapcell: manual setup via dashboard, only needs Cloudflare for Pages
-      required = []string{"CLOUDFLARE_API_TOKEN"}
+      // Leapcell: Cloudflare token is only required when deploying to Pages (static-only path)
+      required = []string{}
     }
     
     missing := []string{}

@@ -340,49 +340,30 @@ func htmlCacheMiddleware(next http.Handler) http.Handler {
             next.ServeHTTP(w, r)
             return
         }
-        if strings.EqualFold(strings.TrimSpace(env.Get("DISABLE_HTML_CACHE", "")), "1") ||
-            strings.EqualFold(strings.TrimSpace(env.Get("DISABLE_HTML_CACHE", "")), "true") {
-            next.ServeHTTP(w, r)
-            return
-        }
         p := r.URL.Path
         if strings.HasPrefix(p, "/static/") || p == "/favicon.ico" || p == "/robots.txt" || p == "/sitemap.xml" || p == "/healthz" {
             next.ServeHTTP(w, r)
             return
         }
 
-        if strings.EqualFold(strings.TrimSpace(r.Header.Get("HX-Request")), "true") {
-            ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
-            next.ServeHTTP(ww, r)
-            if ww.Header().Get("Cache-Control") == "" {
-                ww.Header().Set("Cache-Control", "private, no-store")
-                addVary(ww.Header(), "Cookie")
-                addVary(ww.Header(), "Accept")
-                addVary(ww.Header(), "HX-Request")
-            }
+        ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
+        next.ServeHTTP(ww, r)
+
+        // Only consider HTML responses
+        ct := strings.ToLower(strings.TrimSpace(ww.Header().Get("Content-Type")))
+        if !strings.Contains(ct, "text/html") {
             return
         }
 
+        // If response sets a cookie or request already has a session cookie, force private, no-store
+        hasSetCookie := strings.TrimSpace(ww.Header().Get("Set-Cookie")) != ""
         hasSession := false
         if sessionManager != nil {
             if _, err := r.Cookie(sessionManager.Cookie.Name); err == nil {
                 hasSession = true
             }
         }
-
-        ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
-        next.ServeHTTP(ww, r)
-
-        if ww.Header().Get("Cache-Control") != "" {
-            return
-        }
-
-        ct := strings.ToLower(strings.TrimSpace(ww.Header().Get("Content-Type")))
-        if !strings.Contains(ct, "text/html") {
-            return
-        }
-
-        if hasSession {
+        if hasSetCookie || hasSession || strings.EqualFold(strings.TrimSpace(r.Header.Get("HX-Request")), "true") {
             ww.Header().Set("Cache-Control", "private, no-store")
             addVary(ww.Header(), "Cookie")
             addVary(ww.Header(), "Accept")
@@ -390,6 +371,13 @@ func htmlCacheMiddleware(next http.Handler) http.Handler {
             return
         }
 
+        // Allow disabling via env
+        if strings.EqualFold(strings.TrimSpace(env.Get("DISABLE_HTML_CACHE", "")), "1") ||
+            strings.EqualFold(strings.TrimSpace(env.Get("DISABLE_HTML_CACHE", "")), "true") {
+            return
+        }
+
+        // Public cacheable HTML
         ttl := 60
         if v := strings.TrimSpace(env.Get("CACHE_PUBLIC_TTL", "")); v != "" {
             if n, err := strconv.Atoi(v); err == nil && n >= 0 { ttl = n }
@@ -398,7 +386,6 @@ func htmlCacheMiddleware(next http.Handler) http.Handler {
         if v := strings.TrimSpace(env.Get("CACHE_SWREVAL_TTL", "")); v != "" {
             if n, err := strconv.Atoi(v); err == nil && n >= 0 { swr = n }
         }
-
         ww.Header().Set("Cache-Control", fmt.Sprintf("public, s-maxage=%d, stale-while-revalidate=%d", ttl, swr))
         addVary(ww.Header(), "Cookie")
         addVary(ww.Header(), "Accept")

@@ -1032,7 +1032,21 @@ func (repo *%sRepository) Delete(ctx context.Context, id int64) error {
 	// TODO: Implement database delete
 	return nil
 }
-`, pas, keb, pas, structFields.String(), pas, pas, pas, pas, pas, pas, pas, keb, pas, pas, keb, pas, pas, pas, pas, keb, pas, pas, keb, pas, pas)
+`,
+    // 1-4: header and struct
+    pas, keb, pas, structFields.String(),
+    // 5-11: repo comment, type, constructor and return
+    pas, pas, pas, pas, pas, pas, pas,
+    // 12-16: FindByID comment/receiver/return/table/item type
+    pas, pas, pas, keb, pas,
+    // 17-19: FindAll comment/receiver/return elem type
+    keb, pas, pas,
+    // 20-22: Create comment/receiver/param type
+    pas, pas, pas,
+    // 23-25: Update comment/receiver/param type
+    pas, pas, pas,
+    // 26-27: Delete comment/receiver type
+    pas, pas)
     
     if err := execx.WriteFileIfMissing(modelPath, []byte(modelSrc), 0o644); err != nil { return err }
     

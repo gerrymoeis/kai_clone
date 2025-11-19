@@ -12,6 +12,7 @@ import (
   "github.com/pressly/goose/v3"
   _ "github.com/jackc/pgx/v5/stdlib"
   "github.com/spf13/cobra"
+  "gothicforge3/internal/env"
 )
 
 var (
@@ -22,9 +23,11 @@ var (
 
 var dbCmd = &cobra.Command{
   Use:   "db",
-  Short: "Database helpers (Neon)",
+  Short: "Database helpers (goose migrations)",
   RunE: func(cmd *cobra.Command, args []string) error {
     banner()
+    // Load .env so DATABASE_URL and friends are available when running locally
+    _ = env.Load()
     dsn := os.Getenv("DATABASE_URL")
     if dsn == "" {
       return errors.New("DATABASE_URL is not set; cannot run migrations")

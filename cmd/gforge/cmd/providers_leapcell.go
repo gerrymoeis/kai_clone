@@ -23,9 +23,9 @@ func runLeapcellDeploy(ctx context.Context, reader *bufio.Reader, dryRun bool) e
 	fmt.Println("\n╔══════════════════════════════════════════════════════════════╗")
 	fmt.Println("║          🚀 GOTHIC FORGE - LEAPCELL DEPLOYMENT             ║")
 	fmt.Println("╚══════════════════════════════════════════════════════════════╝")
-	
+
 	printLeapcellIntro()
-	
+
 	// Step-by-step guided setup
 	if err := printLeapcellSteps(reader); err != nil {
 		return fmt.Errorf("leapcell deployment failed: %w", err)
@@ -215,7 +215,7 @@ func leapcellStep5TrackURL(reader *bufio.Reader) error {
 	fmt.Println("Or if you set a custom domain:")
 	fmt.Println("  https://yourdomain.com")
 	fmt.Println("")
-	
+
 	fmt.Print("Enter your Leapcell deployment URL: ")
 	url, _ := reader.ReadString('\n')
 	url = strings.TrimSpace(url)
@@ -251,7 +251,7 @@ func printLeapcellSuccess() {
 	fmt.Println("")
 	fmt.Println("✅ Your Gothic Forge app is now deployed on Leapcell!")
 	fmt.Println("")
-	
+
 	fmt.Println("⚠️  IMPORTANT: Configure Environment Variables")
 	fmt.Println("──────────────────────────────────────────")
 	fmt.Println("Your app needs environment variables to function properly.")
@@ -275,7 +275,23 @@ func printLeapcellSuccess() {
 	fmt.Println("")
 	fmt.Println("💡 After adding variables, click 'Redeploy' in Leapcell dashboard")
 	fmt.Println("")
-	
+
+	fmt.Println("🌐 CLOUDFLARE PROXY (RECOMMENDED):")
+	fmt.Println("──────────────────────────────────────────")
+	fmt.Println("  1) Point your domain to the Leapcell URL and orange‑cloud it")
+	fmt.Println("  2) Cache Rules:")
+	fmt.Println("     • Cache Everything: /static/*  → Edge TTL 1y; respect origin")
+	fmt.Println("     • Cache Everything: /          → short TTL (60–300s); respect origin")
+	fmt.Println("     • Bypass Cache:   /api/*, /auth/*, /dashboard/*")
+	fmt.Println("")
+
+	fmt.Println("🔎 VERIFY CACHING (after DNS/Deploy):")
+	fmt.Println("──────────────────────────────────────────")
+	fmt.Println("  curl -I $URL/                          # public HTML: s-maxage=60, stale-while-revalidate=300")
+	fmt.Println("  curl -I $URL/static/styles/output.css  # static: text/css + immutable 1y")
+	fmt.Println("  curl -I -H 'HX-Request: true' $URL/    # HTMX: private, no-store")
+	fmt.Println("")
+
 	fmt.Println("🔄 AUTO-DEPLOYMENT:")
 	fmt.Println("──────────────────────────────────────────")
 	fmt.Println("Future deployments are automatic!")
@@ -283,7 +299,7 @@ func printLeapcellSuccess() {
 	fmt.Println("  git commit -m \"your changes\"")
 	fmt.Println("  git push origin main  ← Triggers automatic deployment")
 	fmt.Println("")
-	
+
 	fmt.Println("📊 MONITORING & DEBUGGING:")
 	fmt.Println("──────────────────────────────────────────")
 	fmt.Println("  • Real-time logs: https://leapcell.io/dashboard → Logs tab")
@@ -291,7 +307,7 @@ func printLeapcellSuccess() {
 	fmt.Println("  • Runtime logs: See application errors and requests")
 	fmt.Println("  • Metrics: CPU, memory, and network usage")
 	fmt.Println("")
-	
+
 	fmt.Println("🛠️  TROUBLESHOOTING:")
 	fmt.Println("──────────────────────────────────────────")
 	fmt.Println("If your site shows unstyled HTML or errors:")
@@ -300,14 +316,14 @@ func printLeapcellSuccess() {
 	fmt.Println("  3. Ensure DATABASE_URL is configured (if using database)")
 	fmt.Println("  4. Check browser console for JavaScript/CSS errors")
 	fmt.Println("")
-	
+
 	fmt.Println("📚 RESOURCES:")
 	fmt.Println("──────────────────────────────────────────")
 	fmt.Println("  • Leapcell Docs: https://docs.leapcell.io/")
 	fmt.Println("  • Discord Support: https://discord.gg/qF7efny8x2")
 	fmt.Println("  • Gothic Forge: README.md in your repo")
 	fmt.Println("")
-	
+
 	fmt.Println("🎁 FREE TIER BENEFITS:")
 	fmt.Println("──────────────────────────────────────────")
 	fmt.Println("  • 20 free projects (perfect for portfolio!)")

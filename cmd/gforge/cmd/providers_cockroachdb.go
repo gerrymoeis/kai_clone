@@ -4,11 +4,14 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -60,7 +63,9 @@ func (c *cockroachClient) do(ctx context.Context, method, path string, in any, o
 		return err
 	}
 	req.Header.Set("Authorization", "Bearer "+c.apiKey)
+	req.Header.Set("X-CC-API-KEY", c.apiKey)
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
 	resp, err := c.hc.Do(req)
 	if err != nil {
 		return err
@@ -134,6 +139,8 @@ func cockroachInteractiveProvision(ctx context.Context, dryRun bool) (string, er
 		fmt.Println("    - True serverless (pay only for usage, scales to zero)")
 		fmt.Println("    - Global distribution (low latency worldwide)")
 		fmt.Println("    - Built-in resilience (automatic replication and failover)")
+		fmt.Println("    - Free resources (Basic): 50M RUs + 10 GiB storage per month")
+		fmt.Println("      Pricing/details: https://www.cockroachlabs.com/pricing/")
 		fmt.Println("")
 		return "", errors.New("COCKROACH_API_KEY required")
 	}
@@ -176,6 +183,11 @@ func cockroachInteractiveProvision(ctx context.Context, dryRun bool) (string, er
 	fmt.Println("    → Creating serverless cluster (this may take 30-60 seconds)...")
 	cluster, err := createCockroachServerlessCluster(ctx, client, clusterName, region)
 	if err != nil {
+		// Provide a helpful hint on common permission/auth issues
+		le := strings.ToLower(err.Error())
+		if strings.Contains(le, "403") || strings.Contains(le, "unauthorized") {
+			fmt.Println("    → Tip: Ensure your COCKROACH_API_KEY is a Service Account key with permissions to create clusters (Organization Admin role). Recreate the key if needed: https://cockroachlabs.cloud/service-accounts")
+		}
 		return "", fmt.Errorf("failed to create cluster: %w", err)
 	}
 	fmt.Printf("    → Cluster created: %s (ID: %s)\n", cluster.Name, cluster.ID)
@@ -202,10 +214,14 @@ func cockroachInteractiveProvision(ctx context.Context, dryRun bool) (string, er
 		return "", fmt.Errorf("failed to create database: %w", err)
 	}
 
-	// Build connection string
+	// Build connection string (escape password; include routing id)
 	host := cluster.Regions[0].SQLDns
+	pwdEsc := url.QueryEscape(password)
 	dsn := fmt.Sprintf("postgresql://%s:%s@%s:26257/%s?sslmode=verify-full",
-		username, password, host, dbName)
+		username, pwdEsc, host, dbName)
+	if rid := strings.TrimSpace(cluster.Config.Serverless.RoutingID); rid != "" {
+		dsn += "&options=--cluster=" + rid
+	}
 
 	// Save to .env
 	kv := map[string]string{"DATABASE_URL": dsn}
@@ -313,8 +329,15 @@ func waitForClusterReady(ctx context.Context, client *cockroachClient, clusterID
 
 // createCockroachSQLUser creates a SQL user and returns the generated password.
 func createCockroachSQLUser(ctx context.Context, client *cockroachClient, clusterID, username string) (string, error) {
+	// Generate a strong password (hex-encoded ≥ 12 chars; using 24 bytes → 48 hex chars)
+	pwd := genStrongHex(24)
+	if len(pwd) < 12 {
+		pwd = genStrongHex(32)
+	}
+
 	payload := map[string]string{
-		"name": username,
+		"name":     username,
+		"password": pwd,
 	}
 
 	var result struct {
@@ -326,7 +349,19 @@ func createCockroachSQLUser(ctx context.Context, client *cockroachClient, cluste
 		return "", err
 	}
 
-	return result.Password, nil
+	if strings.TrimSpace(result.Password) != "" {
+		return result.Password, nil
+	}
+	// Some API responses may omit echoing the password; fallback to our generated one
+	return pwd, nil
+}
+
+func genStrongHex(nBytes int) string {
+	b := make([]byte, nBytes)
+	if _, err := rand.Read(b); err != nil {
+		return ""
+	}
+	return hex.EncodeToString(b)
 }
 
 // createCockroachDatabase creates a database in the cluster.

@@ -76,26 +76,27 @@ Perfect for: Landing pages, blogs, documentation
 
 ---
 
-#### **Option B: Full Stack** (Production - 5 minutes)
+#### **Option B: Full Stack (Leapcell + Cloudflare Proxy)** (Production - ~5 minutes)
 
 Perfect for: Production apps, SaaS, complex applications
 
 ```bash
-# Set up API keys (one-time setup)
+# One-time: CockroachDB service account key (for auto-provision)
 ./gforge secrets --set COCKROACH_API_KEY=<your-key>
-./gforge secrets --set AIVEN_TOKEN=<your-token>
-./gforge secrets --set CLOUDFLARE_API_TOKEN=<your-token>
 
-# Deploy everything
-./gforge deploy --provider=back4app --with-valkey --with-pages
+# Optional: Aiven token for Valkey auto-provision (or paste REDIS_URL interactively)
+./gforge secrets --set AIVEN_TOKEN=<your-token>
+
+# Deploy (guided)
+./gforge deploy --provider=leapcell --with-valkey
 ```
 
 **What you get**:
-- ✅ Go backend (Back4app/Railway)
-- ✅ PostgreSQL database (CockroachDB)
-- ✅ Redis cache (Aiven Valkey)
-- ✅ Static assets (Cloudflare Pages)
-- ✅ Global distribution
+- ✅ Go backend (Leapcell compute)
+- ✅ PostgreSQL-compatible database (CockroachDB Serverless)
+- ✅ Redis-compatible cache (Aiven Valkey)
+- ✅ Cloudflare Proxy CDN (orange‑cloud) in front of Leapcell
+- ✅ Global distribution on generous free tiers
 
 ---
 
